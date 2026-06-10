@@ -76,10 +76,25 @@ Commands run successfully:
 - `python experiments/build_literature_matrix.py`: wrote 351-row related work
   matrix.
 - `powershell -ExecutionPolicy Bypass -File .\build_paper.ps1` from `paper/`:
-  compiled the paper and copied the final PDF.
+  compiled the paper with the official ICLR 2026 LaTeX template and copied the
+  final PDF.
 
-MiKTeX emitted a routine update notice and a small overfull hbox warning, but
-the PDF compiled successfully.
+The paper now uses `paper/iclr2026_conference.sty` and
+`paper/iclr2026_conference.bst` from the official ICLR 2026 template zip. It is
+in anonymous submission mode because `paper/best_of_n_ebm_transformer.tex` does
+not invoke `\iclrfinalcopy`, so the rendered author block is "Anonymous authors
+/ Paper under double-blind review".
+
+Anonymity checks on the compiled PDF text found no occurrences of
+`Jason-Wang313`, `wangz`, `github.com/Jason-Wang313`, or `C:\Users`. PDF
+metadata reports blank Author/Title fields.
+
+Remaining LaTeX warnings after the final rebuild:
+
+- Underfull `\hbox` at lines 134--137.
+- Two `h` float specifiers changed to `ht`.
+- Underfull `\vbox` while outputting the figure page.
+- MiKTeX emitted routine "have not checked for updates" notices.
 
 ## Weaknesses
 
@@ -98,4 +113,3 @@ Final PDF:
 GitHub repository:
 
 https://github.com/Jason-Wang313/best-of-n-ebm-transformer
-

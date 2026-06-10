@@ -1,12 +1,11 @@
-\documentclass[10pt]{article}
+\documentclass{article}
 
-\usepackage[margin=1in]{geometry}
+\usepackage{iclr2026_conference,times}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{hyperref}
-\usepackage[numbers,sort&compress]{natbib}
-\usepackage{times}
+\usepackage{url}
 
 \hypersetup{
   colorlinks=true,
@@ -18,7 +17,6 @@
 \title{When Best-of-N Finds the Wrong Energy Tail:\\
 A Controlled Diagnostic for Transformer-Structured EBMs}
 \author{Anonymous Authors}
-\date{Submitted to ICLR 2026}
 
 \begin{document}
 \maketitle
@@ -217,8 +215,7 @@ attention-shortcut tail. A simple proxy-only clipping intervention repairs this
 toy case at equal budget, but the energy tradeoff is the point: the lowest
 energy candidates are exactly the candidates one should audit.
 
-\bibliographystyle{plainnat}
+\bibliographystyle{iclr2026_conference}
 \bibliography{references}
 
 \end{document}
-
