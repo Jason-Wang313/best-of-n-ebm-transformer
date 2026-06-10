@@ -1,0 +1,20 @@
+{
+  "generated_at_utc": "2026-06-10T14:09:28.396032+00:00",
+  "claims": [
+    {
+      "claim": "Best-of-N drives selected candidates into lower proxy-energy tails.",
+      "status": "supported",
+      "evidence": "N=1 to N=128 selected energy changed by -1.921."
+    },
+    {
+      "claim": "Proxy-energy tail exploitation reduces semantic validity.",
+      "status": "supported",
+      "evidence": "Validity changed by -0.458; true score changed by -0.424."
+    },
+    {
+      "claim": "A proxy-only calibrated clipping repair recovers quality at fixed candidate budget.",
+      "status": "supported",
+      "evidence": "At max N, repair true-score gain is 0.845 with energy tradeoff 1.967."
+    }
+  ]
+}
