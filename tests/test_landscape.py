@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from best_of_n_ebm.landscape import ToyEBMTransformer
+from energy_tail_audit.landscape import ToyEBMTransformer
 
 
 def test_valid_sequence_has_no_global_violations() -> None:

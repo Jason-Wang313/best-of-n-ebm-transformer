@@ -17,22 +17,22 @@ def evaluate_claims(summary_rows: list[dict[str, object]]) -> list[ClaimStatus]:
     for row in summary_rows:
         by_method.setdefault(str(row["method"]), []).append(row)
 
-    bon = sorted(by_method.get("bon", []), key=lambda r: int(r["N"]))
+    min_energy = sorted(by_method.get("min_energy", []), key=lambda r: int(r["N"]))
     repaired = sorted(by_method.get("calibrated_clipped", []), key=lambda r: int(r["N"]))
     claims: list[ClaimStatus] = []
 
-    if bon:
-        n_values = [int(r["N"]) for r in bon]
-        energies = np.array([float(r["selected_energy_mean"]) for r in bon])
-        validity = np.array([float(r["selected_valid_mean"]) for r in bon])
-        true_score = np.array([float(r["selected_true_score_mean"]) for r in bon])
+    if min_energy:
+        n_values = [int(r["N"]) for r in min_energy]
+        energies = np.array([float(r["selected_energy_mean"]) for r in min_energy])
+        validity = np.array([float(r["selected_valid_mean"]) for r in min_energy])
+        true_score = np.array([float(r["selected_true_score_mean"]) for r in min_energy])
         energy_drop = energies[0] - energies[-1]
         validity_drop = validity[0] - validity[-1]
         true_drop = true_score[0] - true_score[-1]
         status = "supported" if energy_drop > 0.25 and validity_drop > 0.25 else "weak"
         claims.append(
             ClaimStatus(
-                "Best-of-N drives selected candidates into lower proxy-energy tails.",
+                "Minimum-energy selection drives candidates into lower proxy-energy tails.",
                 "supported" if energy_drop > 0.25 else "weak",
                 f"N={n_values[0]} to N={n_values[-1]} selected energy changed by {-energy_drop:.3f}.",
             )
@@ -45,14 +45,14 @@ def evaluate_claims(summary_rows: list[dict[str, object]]) -> list[ClaimStatus]:
             )
         )
 
-    if bon and repaired:
-        bon_last = bon[-1]
+    if min_energy and repaired:
+        min_energy_last = min_energy[-1]
         rep_last = repaired[-1]
         repair_gain = float(rep_last["selected_true_score_mean"]) - float(
-            bon_last["selected_true_score_mean"]
+            min_energy_last["selected_true_score_mean"]
         )
         repair_energy = float(rep_last["selected_energy_mean"]) - float(
-            bon_last["selected_energy_mean"]
+            min_energy_last["selected_energy_mean"]
         )
         claims.append(
             ClaimStatus(
@@ -63,4 +63,3 @@ def evaluate_claims(summary_rows: list[dict[str, object]]) -> list[ClaimStatus]:
         )
 
     return claims
-

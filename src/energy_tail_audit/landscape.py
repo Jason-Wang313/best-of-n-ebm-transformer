@@ -52,8 +52,9 @@ class ToyEBMTransformer:
     prompt-conditioned mirror transform of the first half. The proxy energy is
     local and attention-mediated. It rewards low-cost local token interactions,
     including a deliberately misspecified artifact pocket made of special
-    shortcut tokens. This lets Best-of-N expose a winner's-curse style failure
-    without needing large models or labels during selection.
+    shortcut tokens. This lets minimum-energy candidate selection expose a
+    winner's-curse style failure without needing large models or labels during
+    selection.
     """
 
     def __init__(
@@ -214,4 +215,3 @@ class ToyEBMTransformer:
             idx = int(rng.integers(0, self.length))
             seq[idx] = int(rng.integers(0, self.vocab))
         return seq
-

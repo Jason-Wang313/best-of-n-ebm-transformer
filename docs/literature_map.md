@@ -5,7 +5,7 @@ Sweep date: 2026-06-10.
 This map is grounded in the generated matrix at `docs/related_work_matrix.csv`,
 which currently contains 351 arXiv/OpenReview-backed rows. The matrix was built
 with `python experiments/build_literature_matrix.py` and covers these themes:
-Best-of-N, reward hacking, reward-model overoptimization, test-time compute,
+sample-and-rank inference, reward hacking, reward-model overoptimization, test-time compute,
 verifier search, self-consistency, preference optimization, rejection sampling,
 energy-based text models, energy-based diffusion language models,
 Transformer/energy hybrids, and EBM sampling.
@@ -26,39 +26,39 @@ inference" are not novel. The usable opening is failure analysis: what happens
 when a simple sample-and-select policy is bolted onto a Transformer-structured
 energy model whose energy is a misspecified proxy?
 
-## Best-of-N And Inference-Time Alignment
+## Sample-And-Rank Inference-Time Alignment
 
-The BoN literature is already large. It establishes that sample-and-select can be
-effective, that it can be distilled, and that it has theoretically analyzable
-alignment policies:
+The sample-and-rank literature is already large. It establishes that selecting
+from multiple candidates can be effective, that it can be distilled, and that it
+has theoretically analyzable alignment policies:
 
-- BOND: Best-of-N distillation: https://arxiv.org/abs/2407.14622
-- Regularized Best-of-N (RBoN): https://arxiv.org/html/2404.01054v3
-- Best-of-N reward hacking evaluation: https://arxiv.org/abs/2502.12668
-- Inference-aware fine-tuning for BoN: https://arxiv.org/abs/2412.15287
+- Distillation for sample-and-rank policies: https://arxiv.org/abs/2407.14622
+- Proximity-regularized selection: https://arxiv.org/html/2404.01054v3
+- Inference-time reward hacking evaluation: https://arxiv.org/abs/2502.12668
+- Inference-aware fine-tuning: https://arxiv.org/abs/2412.15287
 
-Implication: a paper cannot claim to discover BoN, BoN overoptimization, or
-generic BoN regularization. It can claim a controlled EBT-specific diagnostic if
-the mechanism is not just "reward model imperfect."
+Implication: a paper cannot claim to discover sample-and-rank selection, proxy
+overoptimization, or generic regularization. It can claim a controlled
+EBT-specific diagnostic if the mechanism is not just "reward model imperfect."
 
 ## Reward Hacking And Goodhart Prior
 
 The strongest hostile prior is reward-model overoptimization. Gao et al. study
-gold-vs-proxy reward under both RL and BoN in a synthetic setting:
+gold-vs-proxy reward under optimization pressure in a synthetic setting:
 
 - Scaling Laws for Reward Model Overoptimization:
   https://arxiv.org/abs/2210.10760
 
-Khalaf et al. characterize inference-time reward hacking under BoN and related
-mechanisms and introduce hedging procedures:
+Khalaf et al. characterize inference-time reward hacking under sample selection
+and related mechanisms and introduce hedging procedures:
 
 - Inference-Time Reward Hacking in Large Language Models:
   https://arxiv.org/abs/2506.19248
 
-Implication: the final claim must not be "BoN can reward hack." The contribution
-must instead identify a mechanism that is natural in Transformer-structured
-energies: attention-mediated compositional shortcuts can create low-energy local
-regions that are globally invalid.
+Implication: the final claim must not be "selection can reward hack." The
+contribution must instead identify a mechanism that is natural in
+Transformer-structured energies: attention-mediated compositional shortcuts can
+create low-energy local regions that are globally invalid.
 
 ## Test-Time Compute And Verifiers
 
@@ -97,18 +97,17 @@ diffusion step and also use parallel important sampling:
 - EDLM: https://arxiv.org/abs/2410.21357
 
 Implication: energy-based reranking and importance sampling for text are also
-not novel. This project should focus on the interaction between BoN selection
-pressure and Transformer-like local attention energy decomposition.
+not novel. This project should focus on the interaction between minimum-energy
+selection pressure and Transformer-like local attention energy decomposition.
 
 ## Surviving Gap
 
 The viable gap after the sweep is:
 
-> A controlled diagnostic for Best-of-N inference in Transformer-structured
-> energy models, showing how local attention-mediated shortcut energies can
-> dominate global semantic validity as N grows, plus a proxy-only calibrated
-> clipping repair that improves the toy setting at equal candidate budget.
+> A controlled shortcut-energy audit for Transformer-structured energy models,
+> showing how local attention-mediated shortcut energies can dominate global
+> semantic validity as N grows, plus a proxy-only calibrated clipping repair
+> that improves the toy setting at equal candidate budget.
 
 This is deliberately narrower than the initial ambition. It is a first-pass
 mechanism paper, not a benchmark paper and not a proof that deployed EBTs fail.
-

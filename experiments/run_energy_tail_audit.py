@@ -14,11 +14,11 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from best_of_n_ebm.claims import evaluate_claims
-from best_of_n_ebm.diagnostics import aggregate_rows, pool_diagnostics
-from best_of_n_ebm.landscape import ToyEBMTransformer
-from best_of_n_ebm.selection import (
-    select_best_of_n,
+from energy_tail_audit.claims import evaluate_claims
+from energy_tail_audit.diagnostics import aggregate_rows, pool_diagnostics
+from energy_tail_audit.landscape import ToyEBMTransformer
+from energy_tail_audit.selection import (
+    select_min_energy,
     select_calibrated_clipped,
     select_diversity_constrained,
 )
@@ -55,7 +55,7 @@ def run(preset: str) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     seeds, trials_per_seed = preset_config(preset)
     landscape = ToyEBMTransformer()
     methods = {
-        "bon": select_best_of_n,
+        "min_energy": select_min_energy,
         "calibrated_clipped": select_calibrated_clipped,
         "diversity_constrained": select_diversity_constrained,
     }
@@ -185,28 +185,28 @@ def main() -> None:
         "selected_true_score",
         "selected true score",
         FIGURES / "validity_vs_n.png",
-        ["bon", "calibrated_clipped", "diversity_constrained"],
+        ["min_energy", "calibrated_clipped", "diversity_constrained"],
     )
     plot_metric(
         summary_rows,
         "selected_energy",
         "selected proxy energy",
         FIGURES / "energy_tail_vs_n.png",
-        ["bon", "calibrated_clipped"],
+        ["min_energy", "calibrated_clipped"],
     )
     plot_metric(
         summary_rows,
         "artifact_selected",
         "artifact selection rate",
         FIGURES / "artifact_selection_vs_n.png",
-        ["bon", "calibrated_clipped", "diversity_constrained"],
+        ["min_energy", "calibrated_clipped", "diversity_constrained"],
     )
     plot_metric(
         summary_rows,
         "score_execution_spearman",
         "pool proxy/true rank correlation",
         FIGURES / "score_mismatch_vs_n.png",
-        ["bon"],
+        ["min_energy"],
     )
 
     print(f"Wrote {RESULTS / f'{args.preset}_summary.csv'}")

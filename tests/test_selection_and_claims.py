@@ -4,27 +4,27 @@ import inspect
 
 import numpy as np
 
-from best_of_n_ebm.claims import evaluate_claims
-from best_of_n_ebm.diagnostics import pool_diagnostics
-from best_of_n_ebm.landscape import ToyEBMTransformer
-from best_of_n_ebm.selection import select_best_of_n, select_calibrated_clipped
+from energy_tail_audit.claims import evaluate_claims
+from energy_tail_audit.diagnostics import pool_diagnostics
+from energy_tail_audit.landscape import ToyEBMTransformer
+from energy_tail_audit.selection import select_min_energy, select_calibrated_clipped
 
 
-def test_best_of_n_selects_minimum_proxy_energy() -> None:
+def test_min_energy_selects_minimum_proxy_energy() -> None:
     model = ToyEBMTransformer()
     rng = np.random.default_rng(11)
     prompt = model.sample_prompt(rng)
     batch = model.sample_candidates(prompt, 32, rng)
-    selected = select_best_of_n(batch)
+    selected = select_min_energy(batch)
     assert selected.index == int(np.argmin(batch.proxy_energy))
 
 
-def test_nested_best_of_n_energy_is_nonincreasing() -> None:
+def test_nested_min_energy_is_nonincreasing() -> None:
     model = ToyEBMTransformer()
     rng = np.random.default_rng(12)
     prompt = model.sample_prompt(rng)
     pool = model.sample_candidates(prompt, 128, rng)
-    energies = [select_best_of_n(pool.take(n)).proxy_energy for n in [1, 2, 4, 8, 16, 32, 64, 128]]
+    energies = [select_min_energy(pool.take(n)).proxy_energy for n in [1, 2, 4, 8, 16, 32, 64, 128]]
     assert all(next_energy <= energy for energy, next_energy in zip(energies, energies[1:]))
 
 
@@ -40,9 +40,9 @@ def test_repair_uses_same_candidate_budget() -> None:
     rng = np.random.default_rng(13)
     prompt = model.sample_prompt(rng)
     batch = model.sample_candidates(prompt, 64, rng)
-    bon = select_best_of_n(batch)
+    min_energy = select_min_energy(batch)
     repaired = select_calibrated_clipped(batch)
-    assert 0 <= bon.index < 64
+    assert 0 <= min_energy.index < 64
     assert 0 <= repaired.index < 64
 
 
@@ -55,8 +55,8 @@ def test_diagnostic_rows_support_expected_failure_on_toy_setting() -> None:
         pool = model.sample_candidates(prompt, 128, rng)
         for n in [1, 128]:
             batch = pool.take(n)
-            selected = select_best_of_n(batch)
-            rows.append({"N": n, "method": "bon", **pool_diagnostics(batch, selected)})
+            selected = select_min_energy(batch)
+            rows.append({"N": n, "method": "min_energy", **pool_diagnostics(batch, selected)})
     low_n = [row for row in rows if row["N"] == 1]
     high_n = [row for row in rows if row["N"] == 128]
     assert np.mean([row["selected_energy"] for row in high_n]) < np.mean(
@@ -70,14 +70,14 @@ def test_diagnostic_rows_support_expected_failure_on_toy_setting() -> None:
 def test_claim_evaluator_marks_strong_synthetic_rows_supported() -> None:
     rows = [
         {
-            "method": "bon",
+            "method": "min_energy",
             "N": 1,
             "selected_energy_mean": 0.1,
             "selected_valid_mean": 0.9,
             "selected_true_score_mean": 0.9,
         },
         {
-            "method": "bon",
+            "method": "min_energy",
             "N": 128,
             "selected_energy_mean": -0.8,
             "selected_valid_mean": 0.3,
@@ -100,4 +100,3 @@ def test_claim_evaluator_marks_strong_synthetic_rows_supported() -> None:
     ]
     claims = evaluate_claims(rows)
     assert any(claim.status == "supported" for claim in claims)
-

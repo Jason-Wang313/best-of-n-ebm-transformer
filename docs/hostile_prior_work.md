@@ -12,29 +12,30 @@ Strong prior:
 - Khalaf et al., "Inference-Time Reward Hacking in Large Language Models",
   arXiv:2506.19248.
 
-Why it is hostile: these papers already show that optimizing an imperfect proxy,
-including with BoN, can reduce true reward. Khalaf et al. explicitly cover BoN
-and show a broad reward-hacking pattern for inference-time mechanisms.
+Why it is hostile: these papers already show that optimizing an imperfect proxy
+with inference-time selection can reduce true reward. Khalaf et al. show a broad
+reward-hacking pattern for inference-time mechanisms.
 
 Response: the final contribution is not the generic Goodhart effect. The toy
 landscape isolates an EBT-shaped mechanism: a Transformer-like attention energy
 decomposition assigns extreme low energies to locally compatible shortcut
 motifs, while the true rule depends on global prompt-conditioned consistency.
 
-## 2. "RBoN already fixes this."
+## 2. "Proximity regularization already fixes this."
 
 Strong prior:
 
-- Jinnai et al., "Regularized Best-of-N Sampling to Mitigate Reward Hacking for
-  Language Model Alignment", arXiv:2404.01054.
+- Jinnai et al., "Regularized sample selection to mitigate reward hacking for
+  language model alignment", arXiv:2404.01054.
 
-Why it is hostile: RBoN adds proximity regularization during selection and is
-directly targeted at BoN reward hacking.
+Why it is hostile: proximity regularization during selection is directly
+targeted at inference-time reward hacking.
 
 Response: this artifact's repair is narrower and diagnostic. It does not claim
-to dominate RBoN. It shows that, when the failure is localized in an attention
-shortcut component of an energy model, a proxy-only tail clipping plus shortcut
-penalty can recover validity at equal candidate budget in the controlled setup.
+to dominate proximity-regularized selection. It shows that, when the failure is
+localized in an attention shortcut component of an energy model, a proxy-only
+tail clipping plus shortcut penalty can recover validity at equal candidate
+budget in the controlled setup.
 
 ## 3. "EBMs and residual text energies already use importance sampling."
 
@@ -80,6 +81,6 @@ Why it is hostile: EBTs already frame inference as energy minimization and
 report gains from inference-time computation.
 
 Response: this repo does not evaluate the EBT paper's model. It proposes a small
-controlled stress test that should be run before trusting naive BoN over any
-Transformer-structured energy. The claim is an early warning, not a refutation.
-
+controlled stress test that should be run before trusting naive minimum-energy
+selection over any Transformer-structured energy. The claim is an early warning,
+not a refutation.

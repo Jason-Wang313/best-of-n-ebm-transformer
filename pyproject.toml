@@ -1,7 +1,7 @@
 [project]
-name = "best-of-n-ebm-transformer"
+name = "energy-tail-audit"
 version = "0.1.0"
-description = "Synthetic diagnostics for Best-of-N inference in Transformer-structured energy models."
+description = "Synthetic shortcut-energy audits for Transformer-structured energy models."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -13,4 +13,3 @@ dependencies = [
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-q"
-

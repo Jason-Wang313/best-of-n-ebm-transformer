@@ -24,16 +24,15 @@ Mostly true in this toy setting, and that is why the paper reports the energy
 tradeoff. The repair is best read as a diagnostic intervention: if clipping the
 tail restores validity, the low-energy tail was suspect.
 
-## Attack: The paper ignores stronger baselines like RBoN and HedgeTune.
+## Attack: The paper ignores stronger baselines like proximity-regularized selection and hedging.
 
 The related work names them as stronger general-purpose mitigation lines. This
-artifact's baseline is intentionally local: vanilla BoN versus a mechanism-aware
-proxy-only selector on the same candidates. A benchmark paper would need those
-baselines.
+artifact's baseline is intentionally local: minimum-energy selection versus a
+mechanism-aware proxy-only selector on the same candidates. A benchmark paper
+would need those baselines.
 
 ## Attack: Results are too small for ICLR.
 
 Fair. The repo produces an anonymous ICLR-style paper, but the evidence level is
 closer to a workshop mechanism note or negative result. The final audit should
 make that explicit.
-

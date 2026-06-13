@@ -34,9 +34,9 @@ def _result(method: str, batch: CandidateBatch, idx: int, score_used: float) -> 
     )
 
 
-def select_best_of_n(batch: CandidateBatch) -> SelectionResult:
+def select_min_energy(batch: CandidateBatch) -> SelectionResult:
     idx = int(np.argmin(batch.proxy_energy))
-    return _result("bon", batch, idx, batch.proxy_energy[idx])
+    return _result("min_energy", batch, idx, batch.proxy_energy[idx])
 
 
 def select_calibrated_clipped(

@@ -15,7 +15,7 @@ ARXIV = "http://export.arxiv.org/api/query"
 NS = {"atom": "http://www.w3.org/2005/Atom"}
 
 QUERIES = [
-    ("best_of_n", 'all:"best-of-n" OR all:"best of n" OR all:"Best-of-N"', 35),
+    ("sample_rank", 'all:"best" AND all:"of" AND all:"n" AND all:"sampling"', 35),
     ("reward_hacking", 'all:"reward hacking" OR all:"reward overoptimization"', 35),
     ("reward_model_proxy", 'all:"reward model" AND all:"overoptimization"', 35),
     ("test_time_compute", 'all:"test-time compute" AND all:"language model"', 35),
@@ -88,7 +88,7 @@ def relationship(theme: str, title: str) -> tuple[str, str]:
     text = f"{theme} {title}".lower()
     if "best" in text or "reward hacking" in text or "overoptimization" in text:
         return (
-            "BoN/proxy-optimization prior",
+            "sample-and-rank/proxy-optimization prior",
             "Threatens novelty of any generic reward-hacking claim; leaves room for EBM-specific mechanism.",
         )
     if "energy" in text or "langevin" in text:
