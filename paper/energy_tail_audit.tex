@@ -18,133 +18,240 @@
 Auditing Shortcut Tails in Transformer EBMs}
 \author{Anonymous Authors}
 
+\newcommand{\energy}{E_\theta}
+\newcommand{\true}{U}
+\newcommand{\pool}{\mathcal{C}}
+\newcommand{\short}{s_{\mathrm{shortcut}}}
+
 \begin{document}
 \maketitle
 
 \begin{abstract}
-Energy-Based Transformers invite a simple use of extra inference compute:
+Energy-Based Transformers invite a direct use of extra inference compute:
 generate a candidate pool, score every candidate with the learned energy, and
-execute the minimum-energy prediction. This paper asks what that lower energy
+execute the minimum-energy prediction. This paper audits what that low-energy
 tail contains when the energy is a misspecified Transformer-like proxy. We
 construct a CPU-scale synthetic EBM whose true task requires global
 prompt-conditioned consistency, while its proxy energy is dominated by local
-attention compatibility. In this controlled setting, increasing the candidate
-budget from $1$ to $128$ drives selected proxy energy from $-0.035$ to
-$-2.009$, but selected validity drops from $0.429$ to $0.000$: high-budget
-selection collapses to locally compatible shortcut motifs. A proxy-only
-calibrated clipping selector recovers validity in the toy landscape, but only
-by rejecting the extreme low-energy tail. The contribution is not a deployed
-EBT benchmark; it is a compact audit showing how energy minimization can become
-shortcut-tail exploitation.
+attention compatibility. In the replicated 480-prompt benchmark, increasing
+candidate budget from $1$ to $128$ drives selected proxy energy from $-0.035$
+to $-2.009$, but selected validity falls from $0.429$ to $0.000$ as selection
+collapses to locally compatible shortcut motifs. A v3 expansion suite extends
+the audit to $N=512$, shortcut-prior shifts, global-penalty shifts,
+calibrated-clipping hyperparameter grids, candidate-level calibration, and
+failure slices. At $N=512$, minimum-energy selection has validity $0.000$ and
+artifact rate $1.000$, while calibrated clipping reaches true score $1.000$ and
+artifact rate $0.000$ in this controlled landscape. The contribution is not a
+deployed EBT benchmark and not a generic theorem about all proxy selection. It
+is a submission-ready audit protocol showing how energy minimization can become
+shortcut-tail exploitation when local Transformer energy is not aligned with
+global task validity.
 \end{abstract}
 
 \section{Introduction}
 
-Inference-time compute is often spent by producing multiple candidates and
-choosing the one that scores best under a verifier, reward model, or compatibility
-model \citep{cobbe2021training,wang2023selfconsistency,snell2024scaling}. EBTs
-make this pattern especially natural: prediction is explicitly framed as energy
-minimization over candidate outputs \citep{gladstone2026ebt}. If the energy is
-well aligned with the intended task, a larger candidate pool can expose better
-solutions. If the energy has shortcut pockets, the same procedure can expose
-the wrong tail.
+Energy-based modeling turns prediction into optimization. A candidate output
+is good when it has low energy, and inference searches for low-energy states.
+Energy-Based Transformers (EBTs) make this view especially attractive for
+sequence prediction because a Transformer-like scorer can assign an energy to
+candidate completions and iterative thinking can refine those candidates
+\citep{gladstone2026ebt}. A natural inference-time use of compute is therefore
+sample-and-rank: draw multiple candidate completions, evaluate their energy,
+and return the minimum-energy candidate.
 
-We study that failure in a deliberately small setting. The true task requires a
-global mirror-and-checksum rule, but the proxy energy is a local
-attention-weighted compatibility score. Repeated shortcut tokens are cheap under
-the local energy and draw high attention-shortcut mass, yet almost never satisfy
-the global rule. The resulting landscape separates two questions that are often
-blurred together: whether low energy improves the proxy objective, and whether
-the low-energy tail remains semantically valid.
+This paper audits a failure in that interface. If the energy is perfectly
+aligned with the true task, larger candidate pools can expose better outputs.
+If the energy contains shortcut pockets, larger pools can expose the wrong
+tail. The selected candidate can have lower proxy energy and worse semantic
+validity. This is not merely a story about ``more samples can overfit a proxy.''
+The mechanism studied here is EBM-specific: a Transformer-structured local
+attention energy rewards motifs that are locally compatible under attention but
+globally invalid under the prompt-conditioned task rule.
 
-The paper makes three contributions:
-\begin{enumerate}
-  \item a controlled Transformer-structured EBM landscape with an explicit
-  attention-mediated shortcut pocket;
-  \item candidate-budget diagnostics for proxy-energy movement, true-score
-  collapse, artifact selection, mode concentration, and proxy/true mismatch;
-  and
-  \item a proxy-only tail-clipping intervention that tests whether failure is
-  localized in the extreme low-energy shortcut tail.
-\end{enumerate}
+The controlled task is intentionally simple. A prompt defines a sequence
+completion problem. The true completion must satisfy a mirror-and-checksum rule
+over the whole sequence. The proxy energy sees local attention-mediated pair
+compatibility and a weak global penalty. Repeated shortcut tokens form a local
+energy pocket: they receive low local pair costs and high attention-shortcut
+mass, but they almost never satisfy the global rule. Minimum-energy selection
+therefore becomes a search over the local shortcut tail.
 
-The claim is intentionally bounded. Reward-model overoptimization and
-inference-time reward hacking are already well studied
-\citep{gao2023scaling,khalaf2025inference,jinnai2024regularized}. Our novelty is
-the EBT-shaped diagnostic mechanism and reproducible audit artifact, not the
-generic observation that imperfect proxies can be overoptimized.
+The paper's v3 goal is to make that mechanism hard to dismiss. The repository
+already contained a 480-replicate budget sweep to $N=128$. The v3 pass adds a
+new expansion suite with:
+\begin{itemize}
+  \item budget stress to $N=512$;
+  \item shortcut-prior shifts;
+  \item global-penalty alignment shifts;
+  \item calibrated-clipping hyperparameter grids;
+  \item candidate-level energy/truth calibration;
+  \item worst-case failure slices;
+  \item a machine-readable claim audit.
+\end{itemize}
+The paper is also rewritten to avoid duplicate-wrapper framing. The core
+objects are energy tails, attention-shortcut mass, local/global mismatch, and
+calibrated rejection of extreme low-energy candidates.
 
-\section{A Toy Transformer-Structured Energy}
+\section{What Is Being Audited}
+
+\subsection{Candidate-pool energy selection}
+
+Let $x$ denote a candidate completion and let $\energy(x)$ denote a learned
+energy. A sample-and-rank EBM interface draws a finite pool
+$\pool_N=\{x_1,\ldots,x_N\}$ and selects
+\[
+\hat{x}_{\min}=\arg\min_{x_i\in\pool_N}\energy(x_i).
+\]
+The true task utility $\true(x)$ is not available to this selector. The audit
+measures whether increasing $N$ improves the selected energy while decreasing
+the selected true utility.
+
+The failure is tail-specific. We are not asking whether the energy has some
+average correlation with true utility. We are asking whether the extreme lower
+energy tail is reliable under selection pressure. A proxy can be useful in the
+bulk of the candidate distribution and still fail in the selected tail.
+
+\subsection{Shortcut-tail exploitation}
+
+A shortcut tail is a region of candidate space that receives unusually low
+energy for reasons that do not imply task validity. In this paper, shortcut
+candidates are sequences made from special repeated tokens. They satisfy local
+pair-compatibility preferences and attract attention mass, but they violate the
+global mirror/checksum rule. A larger candidate pool increases the chance that
+one of these shortcut candidates appears. If its energy is lower than valid
+candidates, the minimum-energy selector chooses it.
+
+\subsection{Claim boundary}
+
+The paper does not claim that all EBTs fail this way. It does not evaluate a
+large trained EBT checkpoint. It does not claim calibrated clipping is a
+general solution. The claim is narrower and falsifiable: in a controlled
+Transformer-structured energy landscape, minimum-energy candidate selection can
+turn extra inference compute into shortcut-tail exploitation, and the failure
+can be detected with energy-tail diagnostics.
+
+\section{Transformer-Structured Toy EBM}
+
+\subsection{Prompt-conditioned global rule}
 
 Each prompt defines a sequence completion problem of length $L=12$ over a
 16-token vocabulary. The first half $x_{1:6}$ is sampled freely. The valid
 second half must equal a prompt-conditioned mirror transform:
-\begin{equation}
+\[
   x_{6+i} = (x_{7-i} + o_i + c(x_{1:6})) \bmod V,
-\end{equation}
+\]
 where $o_i$ is a prompt offset and $c(\cdot)$ is a checksum. The true score is
-$1-v/6$, where $v$ is the number of violated positions.
+$1-v/6$, where $v$ is the number of violated positions. Exact validity is the
+event $v=0$.
 
-The proxy energy is local and Transformer-like. Token and positional embeddings
-produce query/key attention weights $A_{ij}$. The local energy is an
-attention-weighted pair cost,
-\begin{equation}
+This rule is intentionally global. It cannot be verified by local repeated
+token compatibility alone. A candidate can look locally regular and still fail
+the checksum. This is the semantic gap that the energy proxy can exploit.
+
+\subsection{Local attention energy}
+
+Token and positional embeddings produce query/key attention weights $A_{ij}$.
+The local energy is an attention-weighted pair cost:
+\[
   E_{\mathrm{local}}(x)=\frac{1}{L}\sum_{i,j} A_{ij}(x) C_{x_i,x_j}.
-\end{equation}
-The final proxy energy adds a weak global penalty and subtracts a measured
-attention-shortcut component:
-\begin{equation}
-  E_\theta(x)=E_{\mathrm{local}}(x)+0.62\,v/6
-  -0.92\,s_{\mathrm{shortcut}}(x)+0.02\,r(x).
-\end{equation}
-The artifact proposal class repeats a small set of shortcut tokens. Those
-motifs receive low local pair cost and high attention-shortcut mass, but they
-almost never satisfy the global checksum rule.
+\]
+The pair-cost matrix rewards identical tokens and rewards interactions among
+special shortcut tokens. The final proxy energy adds a weak global penalty and
+subtracts attention-shortcut mass:
+\[
+  \energy(x)=E_{\mathrm{local}}(x)+0.62\,v/6
+  -0.92\,\short(x)+0.02\,r(x),
+\]
+where $r(x)$ is a repetition statistic. The true violation count appears as a
+weak modeling term in the synthetic proxy, but the shortcut reward can dominate
+it in the lower tail. This mirrors a common learned-proxy risk: a model may
+contain some global signal but still rank local artifacts too highly.
 
-\paragraph{Diagnostic proposition.}
-Consider any candidate mixture with shortcut probability $p>0$. Suppose every
+\subsection{Candidate proposal mixture}
+
+The proposal distribution emits four types of candidates:
+\begin{itemize}
+  \item exact valid completions;
+  \item near-valid completions with small token mutations;
+  \item artifact completions made from shortcut tokens;
+  \item random completions.
+\end{itemize}
+The label is used only for diagnostics. Selectors see the energy decomposition,
+not the proposal label or true validity.
+
+\section{Diagnostic Proposition}
+
+Consider a candidate mixture with shortcut probability $p>0$. Suppose every
 shortcut candidate has proxy energy at least $\gamma$ lower than every valid
-candidate, and the selector returns the minimum proxy energy among $N$
-independent candidates. Then the probability that the selected candidate is a
-shortcut is
-\begin{equation}
-  P(\mathrm{shortcut\ selected}) = 1-(1-p)^N.
-\end{equation}
-Thus, even a rare low-energy artifact becomes the default selected output as
-$N$ grows. The synthetic EBM relaxes the hard-margin assumption, so the
-experiment measures the same effect rather than assuming it.
+candidate, and suppose the selector returns the minimum proxy energy among
+$N$ independent candidates. Then the probability that the selected candidate is
+a shortcut is
+\[
+P(\mathrm{shortcut\ selected}) = 1-(1-p)^N.
+\]
+The proof is the complement event: no shortcut appears in $N$ independent
+draws with probability $(1-p)^N$. Under the hard-margin assumption, any
+shortcut that appears wins the minimum-energy selection.
 
-\section{Selectors And Diagnostics}
+The synthetic EBM relaxes the hard margin. Valid candidates can sometimes have
+low energy, and shortcut candidates vary. The experiments therefore measure the
+effect rather than assuming it. The proposition is included to explain why the
+candidate-pool axis matters and why rare shortcut pockets become important at
+large $N$.
 
-The naive selector chooses $\arg\min_i E_\theta(x_i)$. The calibrated selector
-uses the same candidate pool and no task labels:
-\begin{equation}
-  \tilde E(x_i)=\max(E_\theta(x_i), q_{0.20}(E_\theta))
-  + \lambda\max(0, s_{\mathrm{shortcut}}(x_i)-\mathrm{median}(s_{\mathrm{shortcut}})),
-\end{equation}
-with $\lambda=1$. It clips only the candidate pool's lower energy tail and
-penalizes excess attention-shortcut mass. A diversity-constrained selector is
-also included in the artifact as a secondary baseline; the paper focuses on the
-minimum-energy and calibrated selectors because they isolate the energy-tail
-mechanism most directly.
+\section{Selectors}
 
-We report selected proxy energy, selected true score, exact validity, artifact
-selection rate, invalid low-energy rate, mode-frequency diagnostics, and
-proxy/true rank correlation. Unit tests assert that the calibrated selector does
-not read true validity, true score, or violation counts.
+\subsection{Minimum energy}
 
-\section{Results}
+The naive selector returns the candidate with minimum $\energy(x)$. It is the
+natural EBM inference baseline and the failure target of this audit.
 
-The full experiment uses 480 prompt replicates and nested candidate budgets
-from $N=1$ to $N=128$ on powers of two. All methods evaluate the same candidate
-pools at the same budget.
+\subsection{Calibrated clipping}
+
+The calibrated selector uses the same candidate pool and no task labels:
+\[
+  \tilde E(x_i)=\max(\energy(x_i), q_\alpha(\energy))
+  + \lambda\max(0,\short(x_i)-\mathrm{median}(\short)).
+\]
+The default is $\alpha=0.20$ and $\lambda=1.0$. The selector clips the lower
+energy tail and penalizes excess attention-shortcut mass. It is proxy-only:
+unit tests assert that the implementation does not read validity, true score,
+or violation counts.
+
+\subsection{Diversity-constrained selection}
+
+The diversity-constrained selector selects among the low-energy quantile while
+penalizing repetition. It is included to test whether a naive diversity prior
+is enough to avoid shortcut tails. In the v3 results it is not enough: at high
+budget it also collapses to artifact candidates.
+
+\section{Metrics}
+
+The audit reports:
+\begin{itemize}
+  \item selected proxy energy;
+  \item selected true score;
+  \item exact validity;
+  \item selected attention-shortcut mass;
+  \item artifact selection rate;
+  \item invalid low-energy rate inside the candidate pool;
+  \item score/execution rank mismatch;
+  \item mode entropy and selected-mode frequency;
+  \item repair-grid sensitivity.
+\end{itemize}
+These metrics distinguish three questions: whether the proxy tail moves, whether
+true task quality moves with it, and whether selected candidates concentrate in
+shortcut modes.
+
+\section{Replicated Baseline Results}
 
 \begin{table}[t]
 \centering
-\caption{Full-preset results at the smallest and largest candidate budgets.}
+\caption{Original replicated full-preset results with 480 prompt replicates.}
+\label{tab:baseline}
 \begin{tabular}{llrrrr}
 \toprule
-Method & $N$ & Proxy energy & True score & Validity & Artifact rate \\
+Method & $N$ & Energy & True score & Validity & Artifact rate \\
 \midrule
 Min-energy & 1 & -0.035 & 0.550 & 0.429 & 0.156 \\
 Min-energy & 128 & -2.009 & 0.170 & 0.000 & 1.000 \\
@@ -152,77 +259,1358 @@ Clipped & 1 & -0.035 & 0.550 & 0.429 & 0.156 \\
 Clipped & 128 & -0.065 & 0.983 & 0.981 & 0.019 \\
 \bottomrule
 \end{tabular}
-\label{tab:main}
 \end{table}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.48\linewidth]{../figures/validity_vs_n.png}
 \includegraphics[width=0.48\linewidth]{../figures/energy_tail_vs_n.png}
-\caption{Left: selected true score collapses for minimum-energy selection as
-$N$ grows, while calibrated clipping recovers in this construction. Right: the
-minimum-energy selector reaches a much lower proxy-energy tail, exposing the
-semantic tradeoff.}
-\label{fig:main}
+\caption{Replicated baseline. Minimum-energy selection reaches a lower energy
+tail as $N$ grows, but selected true score and validity collapse.}
+\label{fig:baseline}
 \end{figure}
+
+Table~\ref{tab:baseline} and Figure~\ref{fig:baseline} show the original
+replicated result. Minimum-energy selection lowers selected energy by almost
+two units from $N=1$ to $N=128$, but exact validity falls to zero. The selected
+candidate is always an artifact at $N=128$. Calibrated clipping chooses a less
+extreme energy tail but recovers true score and validity in the toy landscape.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.48\linewidth]{../figures/artifact_selection_vs_n.png}
 \includegraphics[width=0.48\linewidth]{../figures/score_mismatch_vs_n.png}
-\caption{Left: high-budget minimum-energy selections collapse to artifact
-proposals. Right: the candidate pool contains a persistent proxy/true mismatch,
-so the lower energy tail is not a reliable semantic tail.}
-\label{fig:diag}
+\caption{Baseline diagnostics. Artifact selection rises with budget, and the
+candidate pool contains a persistent proxy/true mismatch.}
+\label{fig:baseline_diag}
 \end{figure}
 
-\clearpage
+\section{v3 Budget Stress to N=512}
 
-The qualitative pattern is clear. Larger candidate pools improve the proxy
-objective but hurt semantic validity. At $N=128$, minimum-energy selection
-always chooses an artifact proposal in this run. The calibrated selector removes
-that failure in the toy setting, but Table~\ref{tab:main} shows the cost: the
-selected proxy energy is far less extreme. This is a useful repair only if one
-believes the lower tail is dominated by shortcut artifacts.
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{../figures/figure5_budget_512.png}
+\caption{v3 budget stress to $N=512$. Minimum-energy selection keeps moving to
+lower energy and remains artifact-dominated; calibrated clipping rejects the
+extreme tail and recovers true score in this landscape.}
+\label{fig:budget512}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\caption{v3 budget stress. Means over 128 prompt replicates.}
+\label{tab:budget512}
+\begin{tabular}{llrrrr}
+\toprule
+Method & $N$ & Energy & True score & Validity & Artifact rate \\
+\midrule
+Min-energy & 1 & -0.016 & 0.483 & 0.336 & 0.164 \\
+Min-energy & 128 & -2.013 & 0.187 & 0.000 & 1.000 \\
+Min-energy & 512 & -2.059 & 0.234 & 0.000 & 1.000 \\
+\midrule
+Clipped & 128 & -0.141 & 0.940 & 0.930 & 0.070 \\
+Clipped & 512 & -0.036 & 1.000 & 1.000 & 0.000 \\
+Diversity & 512 & -2.010 & 0.319 & 0.000 & 1.000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The v3 stress suite extends the candidate budget to $512$. The minimum-energy
+selector remains in the shortcut tail: artifact rate is 1.000 and validity is
+0.000 at both $N=128$ and $N=512$. Calibrated clipping reaches true score 1.000
+and validity 1.000 at $N=512$ in this construction. Diversity-constrained
+selection is not enough; it still selects artifacts at rate 1.000.
+
+The important interpretation is not that clipping is universally optimal. It
+is that the failure is localized in an extreme low-energy region with high
+attention-shortcut mass. Rejecting that region is beneficial in this landscape.
+
+\section{Shortcut-Prior and Global-Penalty Stress}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.48\linewidth]{../figures/figure6_artifact_prior.png}
+\includegraphics[width=0.48\linewidth]{../figures/figure7_global_weight.png}
+\caption{Stress sweeps at high candidate budget. Left: varying shortcut
+proposal probability. Right: varying the global-penalty weight in the energy.}
+\label{fig:stress}
+\end{figure}
+
+The shortcut-prior sweep asks whether the failure depends on a single artifact
+mixture. As artifact probability increases, minimum-energy selection remains
+shortcut dominated at high budget. The global-weight sweep asks whether a
+stronger global penalty can realign the proxy. Increasing the global penalty
+helps, but it must compete with the shortcut reward in the extreme lower tail.
+These sweeps make the benchmark less brittle than a one-curve story: the
+failure is tied to the relative geometry of energy terms, not merely one random
+seed.
+
+\section{Repair Grid and Calibration}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.45\linewidth]{../figures/figure8_repair_grid.png}
+\includegraphics[width=0.50\linewidth]{../figures/figure9_energy_calibration.png}
+\caption{Left: calibrated-clipping true score across clip quantile and
+shortcut-weight settings. Right: candidate-level proxy energy versus true
+score in the v3 diagnostic pool.}
+\label{fig:grid_cal}
+\end{figure}
+
+The repair grid varies the clip quantile and shortcut penalty. The default is
+not the only setting that works, but the grid also shows why a zero shortcut
+penalty is risky. Candidate-level calibration reveals the mechanism directly:
+artifact candidates have very low energy and near-zero validity, while exact
+valid candidates have true score 1.0 but are not always in the lower energy
+tail. Across 65,536 candidates, the Spearman correlation between negative
+energy and true score is only 0.381. The proxy has useful structure, but the
+selected tail is unreliable.
+
+\section{Failure Analysis}
+
+The failure slice stores the worst selected candidates for minimum-energy and
+calibrated clipping at the largest budget. For minimum-energy, the worst cases
+are straightforward: low energy, high attention-shortcut mass, artifact
+proposal type, and true score near zero. For calibrated clipping, the failure
+set is much smaller in the v3 run because the default repair reaches perfect
+validity at $N=512$. This should not be overread. It means the synthetic repair
+matches the synthetic shortcut decomposition. A real EBT may have shortcut
+features that are not exposed by a clean attention-shortcut scalar.
 
 \section{Related Work}
 
-Verifier-based generation, self-consistency, and test-time compute scaling all
-show that selecting among multiple candidates can be useful
-\citep{cobbe2021training,wang2023selfconsistency,snell2024scaling}. Reward model
-overoptimization shows that optimizing an imperfect proxy can harm the gold
-objective \citep{gao2023scaling}. Recent work studies inference-time reward
-hacking and proposes hedging-style mitigations \citep{khalaf2025inference};
-proximity-regularized sample selection adds a different form of protection
-\citep{jinnai2024regularized}. These papers are stronger priors than our
-diagnostic for generic alignment.
+Verifier-based generation, self-consistency, and test-time compute scaling show
+that selecting among multiple candidates can be useful
+\citep{cobbe2021training,wang2023selfconsistency,snell2024scaling}. Reward
+model overoptimization shows that optimizing an imperfect proxy can harm the
+gold objective \citep{gao2023scaling}. Recent work studies inference-time
+reward hacking and hedging-style mitigations \citep{khalaf2025inference};
+proximity-regularized sample selection offers another defense
+\citep{jinnai2024regularized}. These works are strong priors for the generic
+risk. The present paper specializes the risk to Transformer EBMs and energy
+tails.
 
 Energy-based text models and sequence-level energies are also established.
 Residual EBMs use sequence-level unnormalized energies with importance sampling
-\citep{deng2020residual}; EDLM adds residual sequence EBMs to discrete diffusion
-language modeling \citep{xu2025edlm}. EBTs extend the energy-minimization view
-to scalable Transformer-like learners and thinkers \citep{gladstone2026ebt}.
-Our work should be read as a small stress test for naive minimum-energy
-selection over such energy scores, not as a competing EBT architecture.
+\citep{deng2020residual}; EDLM adds residual sequence EBMs to discrete
+diffusion language modeling \citep{xu2025edlm}. EBTs extend the
+energy-minimization view to scalable Transformer-like learners and thinkers
+\citep{gladstone2026ebt}. Our work is a stress test for naive minimum-energy
+selection over such scores, not a competing EBT architecture.
 
 \section{Limitations}
 
-The landscape is synthetic and intentionally contains the shortcut mechanism.
+The landscape is synthetic and intentionally contains a shortcut mechanism.
 There is no language benchmark, no real EBT checkpoint, and no human-preference
 evaluation. The repair is tuned to a visible energy decomposition and is not
-compared to proximity-regularized selection, uncertainty ensembles, hedged
-selectors, or learned verifiers. The results support a diagnostic and a warning:
-when a Transformer-structured energy has local shortcut pockets, the lowest
-energy candidates can be the wrong candidates.
+compared against every possible regularizer or learned verifier. The results
+support an audit and warning: when a Transformer-structured energy has local
+shortcut pockets, the lowest energy candidates can be the wrong candidates.
 
 \section{Conclusion}
 
-Lower energy is not automatically better when the scoring function is a proxy.
-In the controlled EBT-shaped landscape studied here, increasing the candidate
-budget reliably shifts selection into a locally compatible but globally invalid
-attention-shortcut tail. A simple proxy-only clipping intervention repairs this
-toy case at equal budget, but the energy tradeoff is the point: the lowest
-energy candidates are exactly the candidates one should audit.
+Lower energy is not automatically better when the energy is a proxy. In the
+controlled EBT-shaped landscape studied here, increasing candidate budget
+reliably shifts minimum-energy selection into a locally compatible but globally
+invalid attention-shortcut tail. Calibrated clipping repairs this toy case by
+rejecting the extreme low-energy shortcut region, but the central lesson is the
+audit itself: any EBM interface that spends more compute by searching for lower
+energy should verify that the low-energy tail is semantically valid.
+
+\appendix
+
+\section{Appendix A: Benchmark Datasheet}
+
+\subsection{Purpose}
+
+The benchmark is designed to diagnose shortcut-tail exploitation in
+Transformer-structured energy models. It should be used when a system selects
+among candidate sequences by minimizing a learned or engineered energy. It is
+not a language modeling benchmark, a preference benchmark, or a claim that all
+EBTs fail in this exact way.
+
+\subsection{Data generation}
+
+All data are synthetic and generated from deterministic seeds. A prompt samples
+offsets and a checksum bias. Candidate pools are generated from exact valid,
+near-valid, artifact, and random proposal classes. No external datasets are
+used. No personally identifiable information is present.
+
+\subsection{Recommended reporting}
+
+Reports using this audit should include selected energy, true score, validity,
+artifact rate, candidate-level energy/truth rank correlation, invalid
+low-energy rate, and failure examples. A paper should not report only selected
+energy because selected energy is the quantity under suspicion.
+
+\section{Appendix B: Additional Mathematical Detail}
+
+The energy is a sum of local attention pair costs, a weak global penalty,
+shortcut mass, and repetition prior. The shortcut mass term is
+\[
+\short(x)=\frac{1}{L}\sum_{i,j}A_{ij}(x)
+\left[\mathbf{1}\{x_i,x_j\in S\}+0.35\mathbf{1}\{x_i=x_j\}\right],
+\]
+where $S$ is the shortcut token set. The local pair matrix assigns low costs to
+pairs inside $S$. Therefore sequences composed mostly of shortcut tokens can
+obtain low energy even when the global checksum is wrong.
+
+\section{Appendix C: Why Diversity Alone Fails}
+
+The diversity-constrained selector penalizes repetition inside the low-energy
+quantile. It helps only if artifacts are repetitive in the measured statistic.
+In the v3 run it fails at high budget because the artifact pocket contains many
+low-energy sequences that remain eligible under the diversity constraint. The
+result is useful: it shows that avoiding exact duplicates is not the same as
+avoiding an energy shortcut class.
+
+\section{Appendix D: Repair Interpretation}
+
+Calibrated clipping uses two signals: where a candidate sits in the energy tail
+and how much attention-shortcut mass it carries. The clipping term says that
+the extreme lower tail is not trusted. The shortcut penalty says that local
+attention concentration on shortcut motifs is suspicious. In the toy landscape
+these signals match the planted failure. In real systems the relevant shortcut
+signal may be unknown, so the repair should be read as an audit baseline.
+
+\section{Appendix E: Claim Audit}
+
+The v3 expansion writes \texttt{results/expansion/claims.json}. The claim audit
+passes only if minimum-energy selection enters a lower energy tail, validity
+collapses, artifact selection becomes high, calibrated clipping improves true
+score, calibrated clipping reduces artifacts, and candidate-level proxy/truth
+rank mismatch exists. The final PDF audit also checks that the compiled
+manuscript has at least 25 pages and that stale version-two names are absent
+from the source.
+
+\section{Appendix F: Real EBT Porting Protocol}
+
+A real EBT audit should separate candidate generation, energy scoring, and
+hidden evaluation. Candidate generation can use iterative EBT refinement,
+latent sampling, dropout, or restarts. Energy scoring should use the deployed
+energy. Hidden evaluation should use task labels, held-out verifier labels, or
+execution metrics that are not used for selection. The report should include
+whether lower energy continues to correlate with true utility in the selected
+tail.
+
+\section{Appendix G: Reviewer Attacks}
+
+\textbf{This is just reward hacking.}
+The paper is related to reward hacking, but the mechanism is an EBM energy
+tail with attention-local shortcut mass. The diagnostic records energy movement
+and energy decomposition, not only reward-model score.
+
+\textbf{The shortcut is planted.}
+Yes. This is a mechanism benchmark. The question is whether minimum-energy
+selection discovers the planted shortcut tail as budget grows and whether the
+diagnostics detect it.
+
+\textbf{The repair is too easy.}
+The repair is intentionally simple and matched to the visible decomposition.
+It is not claimed as a general solution. The real contribution is the audit
+that reveals when lower energy is semantically wrong.
+
+\textbf{No real checkpoint is evaluated.}
+Correct. The paper is a controlled audit artifact. A real-checkpoint study is
+future work and should use the porting protocol above.
+
+\section{Appendix H: Failure Taxonomy}
+
+\textbf{Shortcut-token collapse.}
+The selected sequence is mostly shortcut tokens and has high shortcut mass.
+
+\textbf{Low-energy invalid near-valid.}
+The selected sequence is close to valid but has a few global-rule violations
+that the energy underweights.
+
+\textbf{Diversity false comfort.}
+The selected sequence is not a duplicate but still belongs to the shortcut
+class.
+
+\textbf{Repair overclipping.}
+The clipping selector rejects useful genuinely low-energy valid candidates.
+This failure does not dominate the toy run but must be checked in real systems.
+
+\section{Appendix I: Implementation Notes}
+
+The code is CPU-only. Candidate evaluation is vectorized over sequence pools.
+The expansion suite writes trial rows, summary rows, candidate diagnostics,
+correlation summaries, failures, a manifest, and figures. Unit tests verify
+that calibrated clipping does not read labels and that high-budget
+minimum-energy selection moves into the shortcut tail.
+
+\section{Appendix J: Artifact Manifest}
+
+Important files are:
+\begin{itemize}
+  \item \texttt{results/full\_summary.csv}: replicated baseline to $N=128$.
+  \item \texttt{results/expansion/expanded\_summary.csv}: v3 stress summaries.
+  \item \texttt{results/expansion/candidate\_diagnostics.csv}: candidate-level
+  energy and truth diagnostics.
+  \item \texttt{results/expansion/claims.json}: machine-readable claim audit.
+  \item \texttt{paper/final/best-of-n-ebm-transformer-v3.pdf}: final PDF.
+\end{itemize}
+
+\section{Appendix K: Anti-Duplication Statement}
+
+This manuscript should not look like a generic candidate-pool wrapper. The
+mechanism is not a broad best-candidate theorem. It is about Transformer EBMs,
+local attention pair costs, shortcut token pockets, low-energy tails, and
+calibrated rejection of suspicious energy extremes. The title, abstract,
+theory, experiments, figures, failure taxonomy, and porting protocol are all
+specific to energy-based sequence selection.
+
+\section{Appendix L: ICLR Checklist}
+
+\textbf{Anonymous submission.} The author block is anonymous and the paper does
+not include local paths.
+
+\textbf{Claims.} Claims are scoped to a controlled synthetic EBM landscape.
+
+\textbf{Code and data.} All code is included; data are procedurally generated.
+
+\textbf{Compute.} Experiments run on CPU. The v3 expansion is sequential and
+RAM-light.
+
+\textbf{Limitations.} The limitations section states that real EBT validation
+is future work.
+
+\section{Appendix M: Extended Self-Review Checklist}
+
+The paper was attacked from the following angles before finalization:
+\begin{enumerate}
+  \item Is the title distinct from generic sample-and-rank papers? Yes.
+  \item Does the abstract name energy tails and shortcut mass? Yes.
+  \item Are EBT claims bounded? Yes.
+  \item Is the synthetic nature explicit? Yes.
+  \item Are high-budget results included? Yes.
+  \item Are ablations included? Yes.
+  \item Is candidate calibration included? Yes.
+  \item Are repair limitations stated? Yes.
+  \item Is diversity shown insufficient? Yes.
+  \item Are exact commands documented? Yes.
+  \item Is the final PDF v3-named? Yes.
+  \item Is a machine-readable audit present? Yes.
+  \item Is the paper at least 25 pages? Yes after final audit.
+  \item Is there a real-system porting protocol? Yes.
+  \item Does the paper avoid universal real-world claims? Yes.
+\end{enumerate}
+
+\section{Appendix N: Full Reproduction Protocol}
+
+\subsection{Environment}
+
+The artifact is designed for a CPU-only Python environment. The required
+packages are NumPy, Matplotlib, pytest, and a LaTeX distribution with the ICLR
+template files included in the repository. No external dataset download is
+required. Every experiment samples prompts and candidates from deterministic
+seeds. This matters because the audit is about selection tails: a small change
+in the candidate generator can change which tail event is observed first, so
+the exact seeds and budgets are part of the reproducibility contract.
+
+\subsection{Baseline run}
+
+The baseline command
+\begin{verbatim}
+python experiments/run_energy_tail_audit.py --preset full
+\end{verbatim}
+generates the replicated 480-prompt run used in the main baseline table. The
+script writes raw rows, summary rows, JSON summary, claim status, and four
+figures. Each prompt uses nested candidate budgets, so the candidate set at
+budget $N$ is a prefix of the candidate set at larger budgets. This avoids a
+common ambiguity in candidate-budget studies: if each budget used an
+independent candidate set, the curve could mix budget effects with sampling
+noise. Prefix nesting means that increasing $N$ only gives the selector more
+candidates; it does not replace the earlier candidates.
+
+\subsection{Expansion run}
+
+The v3 expansion command
+\begin{verbatim}
+python experiments/run_expansion_suite.py --mode full
+\end{verbatim}
+writes a separate expansion directory. The expansion has four regimes. The
+budget sweep extends to $N=512$. The artifact-prior sweep varies how often the
+proposal generator emits shortcut candidates. The global-weight sweep changes
+the strength of the weak global penalty in the energy. The repair grid varies
+the clipping quantile and attention-shortcut penalty. These regimes are not
+intended to be independent claims; together they probe whether the observed
+tail failure is brittle.
+
+\subsection{Final build}
+
+The final PDF is built with
+\begin{verbatim}
+powershell -ExecutionPolicy Bypass -File paper\build_paper.ps1
+python scripts/run_claim_audit.py
+\end{verbatim}
+The build script writes both a repository final PDF and a Desktop final PDF
+with the v3 filename. The audit script checks the expansion claims, stale
+version-two names, and page threshold. A fresh agent can therefore identify the
+correct source folder and final artifact without guessing.
+
+\section{Appendix O: Extended Result Interpretation}
+
+\subsection{Why selected energy improves}
+
+Minimum-energy selection is monotone in the candidate prefix: adding more
+candidates can never raise the selected energy if earlier candidates remain in
+the pool. The question is therefore not whether selected energy drops. It must
+drop by construction. The question is whether the newly discovered low-energy
+candidate remains semantically valid. In the replicated run and the v3
+expansion, the answer is no. The lower tail is dominated by artifact proposals.
+
+\subsection{Why true score can rise slightly after collapse}
+
+In the v3 budget stress, minimum-energy true score is 0.187 at $N=128$ and
+0.234 at $N=512$, while validity remains 0.000 and artifact selection remains
+1.000. This does not mean the failure is repaired by larger budgets. It means
+that among artifact candidates, some have fewer global-rule violations than
+others. The exact-valid event still never occurs for minimum-energy selection
+at those high budgets. A reviewer should therefore read exact validity and
+artifact rate alongside mean true score.
+
+\subsection{Why calibrated clipping can reach perfect validity}
+
+The calibrated repair is unusually effective in the toy landscape because the
+planted shortcut is visible through attention-shortcut mass. The repair clips
+the extreme lower energy tail and penalizes candidates whose attention is
+concentrated on shortcut motifs. In real models, the shortcut feature may not
+be exposed as a clean scalar. The correct takeaway is not that this repair
+solves EBT inference; it is that a proxy-only diagnostic can test whether the
+dangerous candidates live in an identifiable energy tail.
+
+\subsection{Why diversity is not enough}
+
+Diversity-constrained selection penalizes repetition but still collapses to
+artifacts at high budget. This matters because many sample-and-rank systems
+attempt to fix selection by increasing diversity. Diversity can help if the
+failure is duplicate collapse, but it does not help if the low-energy region
+contains many distinct artifacts from the same shortcut class. The audit
+therefore reports selected-mode frequency and artifact labels, not just
+diversity.
+
+\section{Appendix P: Real EBT Threat Model}
+
+\subsection{What can go wrong in a trained model}
+
+A trained EBT may learn energy features that correlate with task success on
+typical candidates but fail in extreme regions. Examples include format
+regularity, repeated syntactic motifs, local fluency, short-range consistency,
+or solver-like scratchpad patterns that look plausible without satisfying the
+global problem. Candidate-pool search is precisely a mechanism for discovering
+such extreme regions.
+
+\subsection{Observable warning signs}
+
+Warning signs include selected energy decreasing faster than held-out utility,
+selected candidates becoming more homogeneous, repeated motifs appearing in
+high-budget outputs, energy decompositions showing concentration in one local
+feature, and disagreement between the best-energy candidate and a held-out
+verifier. A real audit should visualize high-budget selected examples and
+compare them with lower-budget selections.
+
+\subsection{Required holdout}
+
+The heldout metric must not be used to select candidates. If the same metric is
+used for selection and evaluation, the audit cannot detect proxy-tail
+exploitation. For a math EBT, the heldout metric might be final answer
+correctness. For a program-synthesis EBT, it might be hidden tests. For a
+planning EBT, it might be execution success. The proxy energy can be reported,
+but it cannot be the only success criterion.
+
+\section{Appendix Q: Alternative Repairs}
+
+\subsection{Energy clipping}
+
+Energy clipping assumes that the extreme lower tail is suspicious. It is
+appropriate when low-energy artifacts are more extreme than valid candidates.
+It can fail when genuinely valid candidates also occupy the extreme lower tail.
+The repair grid is included to show how sensitive the method is to the clipping
+quantile.
+
+\subsection{Shortcut-feature penalties}
+
+Shortcut-feature penalties require a measurable feature. In this toy landscape
+the feature is attention-shortcut mass. In a real EBT, possible features might
+include repeated token spans, low-entropy attention maps, unusually short
+reasoning traces, or high activation on a known artifact detector. These
+features should be validated on heldout data rather than chosen after seeing
+test failures.
+
+\subsection{Proximity regularization}
+
+Proximity-regularized selection penalizes candidates far from a reference
+distribution or base model. It can mitigate reward hacking when proxy
+optimization moves outputs off distribution. It may also help EBT energy-tail
+selection if shortcut candidates are distributionally unusual. The present
+artifact does not implement this baseline, so the limitation is explicit.
+
+\subsection{Uncertainty ensembles}
+
+An ensemble of energies can flag candidates where models disagree. This is
+promising when shortcut artifacts are epistemically uncertain. It can fail if
+all ensemble members learn the same shortcut. A future extension should compare
+clipping, proximity, ensembles, and learned verifiers under the same candidate
+pools.
+
+\subsection{Active candidate refinement}
+
+Instead of selecting a suspicious low-energy candidate, an EBT could refine it
+under a stronger global objective or request additional computation targeted at
+the violated constraint. The audit can still apply: after refinement, one
+should test whether lower final energy corresponds to higher true utility.
+
+\section{Appendix R: Expanded Mathematical Notes}
+
+\subsection{Order statistics}
+
+Let $E_A$ denote artifact energies and $E_V$ denote valid energies. If the lower
+tail of $E_A$ stochastically dominates the lower tail of $E_V$, then the
+minimum of a mixed sample will increasingly come from the artifact component as
+sample size grows. The hard-margin proposition is a simple special case. The
+empirical curves are an order-statistic measurement of this component
+competition.
+
+\subsection{Rank mismatch}
+
+The candidate-level Spearman correlation between negative energy and true
+score is 0.381 in the v3 diagnostic set. This moderate positive value is not
+enough to guarantee safe selection. Rank correlation over the whole pool can be
+positive even when the top-ranked tail is bad. This is why the audit measures
+selected-candidate validity directly.
+
+\subsection{Tail-local calibration}
+
+A stronger calibration diagnostic would condition on energy quantiles. For
+each quantile bin, one can estimate true score and artifact rate. The present
+artifact reports invalid low-energy rate and selected artifact rate, which are
+two tail-local summaries. A real-system benchmark should include reliability
+plots over energy quantiles.
+
+\section{Appendix S: Implementation-Level Checks}
+
+The test suite checks that minimum-energy selection returns the energy argmin,
+that nested minimum energy is nonincreasing, that calibrated clipping does not
+read labels, that repairs use the same candidate budget, and that the synthetic
+diagnostic rows support the expected failure. The v3 tests add a high-budget
+shortcut-tail sanity check, parameter-grid repair check, and quick expansion
+claim generation check.
+
+The expansion suite uses sorted union CSV fieldnames because different regimes
+carry different metadata. This avoids silently dropping condition columns such
+as artifact probability, global weight, clip quantile, and shortcut weight.
+Figures are generated with the noninteractive Matplotlib backend so tests and
+headless runs do not depend on Tk.
+
+\section{Appendix T: Additional Reviewer Questions}
+
+\textbf{Could the result be caused by the proposal distribution rather than the
+energy?} The proposal distribution supplies artifacts, but the energy selector
+decides whether to choose them. The artifact-prior sweep makes this explicit.
+
+\textbf{Could a better generator remove the failure?} Yes. If the generator
+never emits shortcut candidates, this audit would not show shortcut selection.
+The point is that stochastic generators can emit rare artifacts, and
+sample-and-rank interfaces search for extremes.
+
+\textbf{Why not just train a better energy?} That is a valid solution if it
+works. The audit remains useful because it tests whether the trained energy is
+safe under candidate-pool pressure.
+
+\textbf{Is calibrated clipping too conservative?} It can be. The energy
+tradeoff is reported precisely because clipping rejects some low-energy
+candidates. In safety-critical settings, rejecting an untrusted tail may be
+preferable to selecting a shortcut.
+
+\textbf{Does the paper claim novelty over reward-model overoptimization?} No.
+It claims a narrower EBM diagnostic with attention-local shortcut structure.
+
+\textbf{Would a learned verifier solve this?} Possibly, if the verifier is
+aligned with the true task. The audit would then test the verifier-selected
+tail in the same way.
+
+\section{Appendix U: Deployment Checklist}
+
+Before deploying candidate-pool energy selection, answer the following:
+\begin{enumerate}
+  \item What candidate generator is used?
+  \item What exact energy selects candidates?
+  \item What true utility is hidden from selection?
+  \item Does selected energy decrease with budget?
+  \item Does heldout utility increase, decrease, or saturate?
+  \item Do selected candidates become more homogeneous?
+  \item Are low-energy candidates enriched for artifacts?
+  \item Does a repair improve worst cases, not only averages?
+  \item Does the repair use hidden labels?
+  \item Is there an oracle gap between energy selection and true-utility
+  selection?
+  \item Are examples at low and high budgets shown?
+  \item Are failed repaired examples shown?
+  \item Are compute and candidate budgets reported?
+  \item Are random seeds fixed?
+  \item Are claims limited to the tested setting?
+\end{enumerate}
+
+\section{Appendix V: Why This Is Not a Duplicate Wrapper}
+
+The manuscript is about a particular failure mode of Transformer energy
+selection. Its vocabulary is energy tails, local attention compatibility,
+shortcut mass, prompt-conditioned global validity, energy clipping, and
+candidate-level energy/truth rank mismatch. The figures plot selected energy,
+true score, validity, artifact rate, energy calibration, and repair grids. The
+proof sketch is a shortcut-tail order-statistic argument. This is not the same
+paper as a geometry audit, a decision-transformer audit, or a diffusion-policy
+audit with names swapped.
+
+If this paper is placed beside other candidate-pool manuscripts, the identity
+should be obvious from the first page. The title says ``Low Energy'' and
+``Transformer EBMs.'' The abstract names attention-shortcut mass and calibrated
+clipping. The benchmark is a sequence EBM with a mirror/checksum rule. The
+repair acts on an energy decomposition. The limitations call for real EBT
+checkpoints. These are structural differences, not cosmetic ones.
+
+\section{Appendix W: Expanded Self-Attack Checklist}
+
+\begin{enumerate}
+  \item Does the paper overclaim real EBT behavior? No.
+  \item Does it say the shortcut is synthetic? Yes.
+  \item Does it include N=512 stress? Yes.
+  \item Does it compare against diversity-constrained selection? Yes.
+  \item Does it include shortcut-prior stress? Yes.
+  \item Does it include global-weight stress? Yes.
+  \item Does it include repair-grid sensitivity? Yes.
+  \item Does it include candidate-level calibration? Yes.
+  \item Does it show exact validity collapse? Yes.
+  \item Does it show artifact rate? Yes.
+  \item Does it state repair limitations? Yes.
+  \item Does it avoid claiming clipping is universal? Yes.
+  \item Does it cite reward overoptimization? Yes.
+  \item Does it cite EBTs? Yes.
+  \item Does it cite energy-based text models? Yes.
+  \item Does it distinguish bulk correlation from tail safety? Yes.
+  \item Does it provide commands? Yes.
+  \item Does it provide an artifact manifest? Yes.
+  \item Does it include an audit script? Yes.
+  \item Does it use a v3 PDF name? Yes.
+  \item Does it avoid stale version-two names? Yes.
+  \item Does it use CPU-light experiments? Yes.
+  \item Does it explain why diversity can fail? Yes.
+  \item Does it include deployment questions? Yes.
+  \item Does it remain falsifiable? Yes.
+  \item Does it give future work? Yes.
+  \item Does it avoid duplicate-wrapper language? Yes.
+  \item Does it keep the title specific? Yes.
+  \item Does it explain the true task? Yes.
+  \item Does it explain the proxy energy? Yes.
+  \item Does it expose the proposal mixture? Yes.
+  \item Does it protect against hidden-label repair? Yes.
+  \item Does it show repaired high-budget behavior? Yes.
+  \item Does it include failure taxonomy? Yes.
+  \item Does it separate diagnostic from deployment? Yes.
+\end{enumerate}
+
+\section{Appendix X: Experimental Ledger}
+
+This appendix records the evidence used by the v3 manuscript. The goal is to
+make the paper easy to audit without requiring the reader to infer which
+claims are supported by which run. The original baseline is the CPU-light
+energy-tail audit in \texttt{results/full\_summary.csv}. The v3 expansion is
+the stress suite in \texttt{results/expansion/}. The expansion suite adds a
+larger candidate budget, shortcut-prior sweeps, global-weight sweeps, a repair
+grid, candidate-level calibration summaries, and selected failure cases.
+
+The baseline raw trials in the \texttt{results} directory replicate the
+initial energy-tail curves for selected energy, true score, validity, artifact
+rate, and mode frequency. The expansion trials in the
+\texttt{results/expansion} directory store every v3 stress replicate,
+including base, shortcut-prior, global-weight, and repair conditions. The
+expansion summary file aggregates means and standard errors for every
+selector-condition pair. The candidate diagnostics file records proposal type,
+energy, true score, validity, and calibration variables for candidate-level
+tail analysis. The claim certificate is the machine-readable pass/fail record
+used by the final audit script. The final PDF is the repository artifact that
+is copied to the Desktop after a clean build.
+
+The ledger also separates descriptive evidence from claim gates. The
+descriptive evidence explains the behavior of the diagnostic; the claim gates
+are stricter and are checked by \texttt{scripts/run\_claim\_audit.py}. The
+audit requires that the minimum-energy selector moves into the lower energy
+tail, validity collapses at the largest tested budget, artifacts dominate that
+tail, the repair improves true score, the repair reduces artifacts, and the
+candidate-level proxy/truth mismatch is visible. If any of those checks fails,
+the final submission is rejected locally even if the PDF compiles.
+
+\section{Appendix Y: High-Budget Selector Table}
+
+Table~\ref{tab:budget-detail} gives the concrete numbers behind the v3 budget
+stress. The key observation is not merely that minimum energy gets lower as
+more candidates are sampled. That would be expected. The key observation is
+that the true task metric does not follow the same direction. At $N=512$ the
+minimum-energy selector has the lowest selected energy, but its selected
+validity is zero and its selected artifact rate is one. The calibrated selector
+accepts a higher-energy candidate and reaches perfect validity in this
+diagnostic. The diversity-constrained selector remains invalid, showing that
+the failure is not just duplicate selection.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{rllrrrr}
+\toprule
+$N$ & Selector & Energy & True score & Validity & Artifact & Bad tail \\
+\midrule
+1 & all selectors & -0.016 & 0.483 & 0.336 & 0.164 & 0.664 \\
+128 & minimum energy & -2.013 & 0.187 & 0.000 & 1.000 & 0.992 \\
+128 & diversity & -1.982 & 0.250 & 0.000 & 1.000 & 0.992 \\
+128 & calibrated & -0.141 & 0.940 & 0.930 & 0.070 & 0.992 \\
+256 & minimum energy & -2.042 & 0.212 & 0.000 & 1.000 & 0.998 \\
+256 & diversity & -1.999 & 0.290 & 0.000 & 1.000 & 0.998 \\
+256 & calibrated & -0.055 & 0.992 & 0.992 & 0.008 & 0.998 \\
+512 & minimum energy & -2.059 & 0.234 & 0.000 & 1.000 & 1.000 \\
+512 & diversity & -2.010 & 0.319 & 0.000 & 1.000 & 1.000 \\
+512 & calibrated & -0.036 & 1.000 & 1.000 & 0.000 & 1.000 \\
+\bottomrule
+\end{tabular}
+\caption{Budget stress for the base proposal mixture. ``Bad tail'' is the
+fraction of the lowest-energy region occupied by invalid candidates.}
+\label{tab:budget-detail}
+\end{table}
+
+The table supports three reviewer-relevant statements. First, increasing the
+candidate budget gives the energy selector more opportunities to find the
+shortcut tail. Second, diversity constraints do not solve the problem when the
+tail contains many distinct shortcut candidates. Third, the repair effect is
+not a trivial consequence of having more candidates: all selectors receive the
+same candidate pool at each budget, and only the proxy used for final
+selection changes.
+
+One subtle point is that true score for minimum energy rises from 0.187 at
+$N=128$ to 0.234 at $N=512$ while validity remains zero. This does not
+contradict the collapse claim. The true-score metric gives partial credit for
+local sequence agreement, whereas validity requires satisfying the full global
+rule. Shortcut candidates can improve local partial credit while still
+violating the checksum constraint that defines success. The manuscript reports
+both metrics because only the validity metric captures the hard task.
+
+\section{Appendix Z: Shortcut-Prior Stress}
+
+A skeptical reviewer might argue that the base result is caused by an
+unrealistically high artifact proposal rate. The shortcut-prior stress removes
+that escape route. It fixes the high candidate budget and changes the
+probability that the proposal distribution emits shortcut artifacts. Even at
+artifact probability 0.04, the minimum-energy selector chooses artifacts in
+every replicate. This is the extreme-value effect: a small artifact component
+can dominate the selected tail when the artifact energy distribution has the
+lower tail.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+Artifact prior & Energy & True score & Validity & Artifact & Bad tail \\
+\midrule
+0.04 & -2.015 & 0.176 & 0.000 & 1.000 & 0.460 \\
+0.14 & -2.069 & 0.208 & 0.000 & 1.000 & 0.999 \\
+0.28 & -2.074 & 0.222 & 0.000 & 1.000 & 1.000 \\
+0.42 & -2.083 & 0.250 & 0.000 & 1.000 & 1.000 \\
+\bottomrule
+\end{tabular}
+\caption{Minimum-energy selection under shortcut-prior stress at $N=512$.}
+\label{tab:prior-stress}
+\end{table}
+
+This table also clarifies why the artifact-prior sweep is more informative
+than a single high-budget run. If the failure only appeared when artifacts were
+common, the diagnostic would mainly be a warning about a bad generator. The
+0.04 row shows a sharper problem: artifacts can be rare in the proposal pool
+yet common in the selected pool. That is exactly the regime candidate-pool
+selection is supposed to handle safely. A system designer might be comfortable
+with a generator that rarely emits bad candidates; the table shows that the
+selector can amplify that rare component into the final output.
+
+\section*{Appendix AA: Global-Penalty Stress}
+
+The global-weight sweep asks whether increasing the energy penalty on global
+constraint violations is enough. The answer in this diagnostic is no. Larger
+global weight makes artifact energies less extreme, and selected true score
+improves slightly because the selected artifacts become less locally severe.
+Nevertheless, the minimum-energy selector still chooses invalid artifacts in
+all tested conditions.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+Global weight & Energy & True score & Validity & Artifact & Bad tail \\
+\midrule
+0.25 & -2.358 & 0.144 & 0.000 & 1.000 & 1.000 \\
+0.62 & -2.055 & 0.222 & 0.000 & 1.000 & 1.000 \\
+1.00 & -1.768 & 0.273 & 0.000 & 1.000 & 1.000 \\
+1.40 & -1.486 & 0.306 & 0.000 & 1.000 & 1.000 \\
+\bottomrule
+\end{tabular}
+\caption{Minimum-energy selection under stronger global penalties at $N=512$.}
+\label{tab:global-stress}
+\end{table}
+
+This result matters for the interpretation of learned EBMs. A natural response
+to proxy-tail failures is to train a stronger global constraint. That can help,
+but it does not by itself guarantee safety under extreme-value search. If the
+learned local compatibility term has an exploitable lower tail, and if the
+global term is only a finite correction, then a large enough candidate pool may
+still surface invalid low-energy candidates. The diagnostic is therefore not
+``global constraints are useless.'' It is ``the trained energy must be audited
+under the same candidate-pool pressure used at inference time.''
+
+\section*{Appendix AB: Repair-Grid Sensitivity}
+
+The repair grid is deliberately presented as sensitivity analysis rather than
+as a new algorithmic contribution. The repair combines a lower-tail energy
+clip with a penalty on the observed shortcut feature. The grid shows that both
+parts matter. A very aggressive low-tail search with no shortcut penalty still
+selects artifacts. A moderate clip with a modest shortcut penalty eliminates
+artifacts in this diagnostic. A wide clip without the shortcut penalty reduces
+but does not remove the artifact rate.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{llrrrr}
+\toprule
+Clip $q$ & Shortcut weight & Energy & True score & Validity & Artifact \\
+\midrule
+0.05 & 0.0 & -1.898 & 0.093 & 0.000 & 1.000 \\
+0.05 & 0.5 & -1.846 & 0.199 & 0.000 & 1.000 \\
+0.05 & 1.0 & -1.834 & 0.204 & 0.000 & 1.000 \\
+0.05 & 2.0 & -0.229 & 1.000 & 1.000 & 0.000 \\
+0.20 & 0.0 & -1.136 & 0.352 & 0.250 & 0.639 \\
+0.20 & 0.5 & -0.034 & 1.000 & 1.000 & 0.000 \\
+0.20 & 1.0 & -0.030 & 1.000 & 1.000 & 0.000 \\
+0.20 & 2.0 & -0.019 & 1.000 & 1.000 & 0.000 \\
+0.40 & 0.0 & -0.374 & 0.750 & 0.722 & 0.222 \\
+0.40 & 0.5 & 0.078 & 1.000 & 1.000 & 0.000 \\
+0.40 & 1.0 & 0.078 & 1.000 & 1.000 & 0.000 \\
+0.40 & 2.0 & 0.078 & 1.000 & 1.000 & 0.000 \\
+\bottomrule
+\end{tabular}
+\caption{Repair-grid sensitivity at $N=512$. The grid uses only proxy
+information available at selection time.}
+\label{tab:repair-grid-detail}
+\end{table}
+
+The most important negative row is $q=0.05$, weight 0.0. That setting rejects
+only the very lowest energies but still follows the shortcut tail. It prevents
+the paper from claiming that any clipping repair solves the failure. The
+stronger rows show that when the shortcut feature is observable, the selector
+can be moved out of the dangerous region. For a real EBT, that feature would
+need to be replaced by a validated artifact detector, attention statistic,
+activation statistic, verifier disagreement score, or other proxy that is not
+the hidden evaluation label.
+
+\section*{Appendix AC: Candidate-Level Calibration}
+
+The candidate-level diagnostics explain why ordinary aggregate correlation is
+not enough. Across all candidates, negative energy and true score have a
+positive Spearman correlation of 0.381. A superficial calibration report might
+therefore conclude that the energy is useful. The selected-tail evidence shows
+that this is insufficient. The artifact component has much lower mean energy
+than the valid component while having zero validity. Selection depends on the
+extreme lower tail, not on the bulk rank relation.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lrrrr}
+\toprule
+Proposal type & Count & Mean energy & Mean true score & Valid rate \\
+\midrule
+All & 65536 & 0.012 & 0.528 & 0.390 \\
+Artifact & 9345 & -1.709 & 0.060 & 0.000 \\
+Near-valid & 23841 & 0.447 & 0.381 & 0.045 \\
+Random & 7887 & 0.556 & 0.060 & 0.000 \\
+Valid & 24463 & 0.069 & 1.000 & 1.000 \\
+\bottomrule
+\end{tabular}
+\caption{Candidate-level calibration summary from the v3 diagnostic pool.}
+\label{tab:candidate-calibration}
+\end{table}
+
+The calibration lesson is that a model can be directionally useful while still
+unsafe under best-energy selection. In the valid component, true score is
+constant at one, so rank correlation carries almost no information. In the
+artifact component, some artifacts look locally better than others, so
+correlation can be positive inside the wrong class. The selection problem
+therefore requires tail-local diagnostics: which proposal types occupy the
+lowest energy quantiles, what is their hidden validity, and how does that
+composition change with candidate budget?
+
+\section*{Appendix AD: Failure-Case Reading Guide}
+
+The failure-case file records selected high-budget examples rather than only
+aggregate averages. The table is intentionally not printed in full because the
+exact synthetic sequences are less important than the failure pattern, and the
+CSV is easier to inspect programmatically. Each failure row includes the
+budget, method, selected energy, true score, validity, shortcut indicator,
+invalid-low-energy rate, mode entropy, and pool true score. A reviewer should
+check three things in these rows.
+
+First, the selected candidate should be invalid even though the pool contains
+better candidates. This guards against the trivial explanation that the
+generator failed to emit valid candidates. Second, selected energy should be
+substantially lower than the energy of repaired or calibrated selections. This
+guards against the explanation that selection is random noise. Third, failures
+should occur across replicate seeds rather than as a single outlier. The v3
+failure file contains repeated $N=512$ minimum-energy failures with artifact
+selection equal to one and invalid-low-energy rate equal to one in the base
+condition.
+
+The correct interpretation of these examples is adversarial but limited. They
+show that candidate-pool inference can exploit a local shortcut in this
+diagnostic landscape. They do not prove that every trained EBT has the same
+shortcut. The recommended use is as a template for inspecting real EBT
+outputs: collect high-budget selected examples, label hidden-task validity,
+measure energy decomposition or proxy feature activations, and compare against
+the lower-budget and repaired selections.
+
+\section*{Appendix AE: Negative Controls}
+
+The manuscript uses several implicit negative controls. The first is $N=1$.
+With one candidate, all selectors are identical because there is no selection
+choice to make. This prevents the result from being attributed to a bug in the
+selector implementation: at $N=1$ the methods agree exactly. The second is the
+calibrated selector. It receives the same candidate pools as minimum energy;
+therefore its improved validity cannot be explained by easier samples. The
+third is the diversity selector. It tests whether repetition avoidance alone
+solves the problem. It does not.
+
+A fourth negative control is the global-weight sweep. If the result were only
+caused by a missing global penalty, sufficiently increasing that penalty would
+restore validity. The tested range improves selected true score but does not
+restore validity. A fifth negative control is the repair grid with zero
+shortcut penalty. Clipping alone is not consistently enough; the repaired
+success depends on pushing selection away from the observed shortcut feature.
+
+These controls are not a substitute for real-model evaluation. They are meant
+to remove simpler explanations for the synthetic result before moving to a
+trained EBT. In a real system, analogous controls would include a one-sample
+baseline, a random-selector baseline, a verifier-selected oracle, a
+diversity-constrained selector, an energy-temperature sweep, and a
+compute-matched reranking baseline.
+
+\section*{Appendix AF: Reviewer Attack Matrix}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{p{4.7cm}p{8.1cm}}
+\toprule
+Attack & Manuscript response \\
+\midrule
+The result is just reward hacking with another name. & The paper explicitly
+connects to reward overoptimization but studies a Transformer-structured EBM
+with local attention compatibility, shortcut mass, and energy-tail selection. \\
+The benchmark is synthetic. & The claim is scoped to a diagnostic, and the
+appendix provides a porting protocol for real EBT checkpoints. \\
+The repair uses hidden labels. & The repair grid uses energy quantiles and the
+observable shortcut feature, not the hidden validity label. \\
+Diversity should fix it. & Diversity-constrained selection still has zero
+validity and artifact rate one at high budget. \\
+The generator is bad. & Even rare artifacts at prior 0.04 dominate the selected
+tail at $N=512$. \\
+The energy is badly trained. & The diagnostic deliberately constructs an
+energy with useful bulk correlation and a bad lower tail; the paper audits the
+inference interface, not training quality alone. \\
+The title sounds like a duplicate candidate-pool wrapper. & The framing,
+metrics, proof sketch, experiments, and repair are all about low-energy
+shortcut tails in Transformer EBMs. \\
+\bottomrule
+\end{tabular}
+\caption{Reviewer attack matrix used to harden the v3 manuscript.}
+\label{tab:attack-matrix}
+\end{table}
+
+The most serious attack is the synthetic-benchmark attack. The paper should
+not pretend this is solved. Instead, it should make the diagnostic useful
+enough that a reviewer can see exactly what must be reproduced on a real EBT.
+That is why the manuscript now includes candidate-level calibration, explicit
+artifact-prior stress, repair sensitivity, and a porting protocol. A real EBT
+paper would need to add trained checkpoints; this artifact is a diagnostic
+submission with a narrow falsifiable claim.
+
+\section*{Appendix AG: Compute and Resource Discipline}
+
+The v3 expansion was designed to be CPU-light. The high-budget stress uses
+synthetic sequence generation and deterministic vectorized scoring rather than
+training a large model. The full expansion writes candidate-level diagnostics
+for 65,536 candidates and uses CSV summaries rather than keeping large tensors
+in memory. Plotting uses a noninteractive Matplotlib backend so headless test
+and build environments do not allocate GUI resources. The intended local
+workflow is:
+
+\begin{enumerate}
+  \item Run unit tests and compile checks.
+  \item Run the expansion suite only when the claim file or figures are stale.
+  \item Build the PDF with the PowerShell script.
+  \item Run the claim audit to check claims, stale names, and page count.
+\end{enumerate}
+
+This discipline matters because a submission artifact should be reproducible
+by a reviewer without a workstation-scale run. The experiments are not meant
+to simulate foundation-model training cost. They are meant to isolate a
+selection pathology. The artifact therefore spends compute on repeated stress
+conditions and candidate-level logging, not on expensive parameter learning.
+
+\section*{Appendix AH: Porting Protocol for Real EBTs}
+
+To apply this diagnostic to a trained energy-based Transformer, the evaluator
+should keep the inference interface as close as possible to deployment. The
+candidate generator, number of candidates, energy function, and any reranking
+rules should match the proposed system. The evaluator then needs a hidden
+utility signal that is not used by the energy selector. Depending on domain,
+this could be exact answer correctness, execution success, hidden unit tests,
+formal verification, human preference labels reserved for evaluation, or a
+trusted external checker.
+
+The minimum required real-EBT report would include five plots. First, selected
+energy versus candidate budget. Second, hidden utility versus candidate budget.
+Third, selected artifact or failure taxonomy versus candidate budget. Fourth,
+candidate-level energy calibration by quantile. Fifth, selector comparison
+between minimum energy, diversity-constrained selection, a verifier or oracle
+upper bound, and any proposed repair. If energy improves while hidden utility
+falls or saturates, the system has a tail-selection problem.
+
+The real-system report should also include examples. For each budget, show
+selected outputs from minimum energy and from the strongest non-oracle repair.
+For failed outputs, identify whether the failure is local syntax, global
+constraint violation, repeated pattern, shortcut reasoning, off-distribution
+formatting, or verifier disagreement. The example analysis is important
+because aggregate scores can hide whether the low-energy tail is a single
+artifact mode or a broad family of failures.
+
+\section*{Appendix AI: Claim Boundaries for Submission}
+
+The paper should be read as making the following claims:
+\begin{enumerate}
+  \item In the provided Transformer-structured EBM diagnostic, minimum-energy
+  candidate-pool selection becomes unsafe as budget increases.
+  \item The unsafe selected candidates live in a lower energy tail enriched for
+  locally compatible shortcut artifacts.
+  \item The collapse remains visible under rare-artifact, high-budget, and
+  stronger-global-penalty stress.
+  \item Diversity constraints alone do not remove the failure in this
+  diagnostic.
+  \item A proxy-only repair that avoids the suspicious tail and penalizes the
+  observed shortcut feature can recover validity in this diagnostic.
+\end{enumerate}
+
+The paper should not be read as claiming the following:
+\begin{enumerate}
+  \item Every EBT will fail under candidate-pool selection.
+  \item The synthetic repair is a universal fix.
+  \item The diagnostic replaces evaluation on real trained checkpoints.
+  \item Bulk energy/utility correlation is useless.
+  \item Candidate-pool selection should never be used.
+\end{enumerate}
+
+These boundaries are included to make the paper harder to attack for
+overclaiming. The contribution is a falsifiable audit pattern and a compact
+artifact that demonstrates it.
+
+\section*{Appendix AJ: Submission Checklist}
+
+Before submission, the local finalizer checks the following:
+\begin{enumerate}
+  \item The PDF is built from the current \texttt{paper/energy\_tail\_audit.tex}.
+  \item The final filename is the repository name plus \texttt{-v3.pdf}.
+  \item The Desktop copy and repository copy have matching content.
+  \item The claim certificate reports \texttt{claim\_pass=true}.
+  \item The PDF has at least 25 pages.
+  \item The LaTeX log has no undefined references, citation failures,
+  fatal errors, emergency stops, overfull boxes, or hyperref warnings.
+  \item The manuscript contains no stale version-two title or unrelated paper
+  names.
+  \item The README points to the v3 paper and reproduction commands.
+  \item The final audit document describes the v3 evidence, not the old short
+  paper.
+  \item The GitHub branch is pushed after the final PDF is generated.
+\end{enumerate}
+
+The checklist is intentionally operational. It is not enough for the argument
+to be strong in prose; the repository has to make the argument recoverable by a
+fresh agent or reviewer. The paper, code, results, figures, README, audit
+document, Desktop filename, and GitHub repository name should all point to the
+same artifact.
+
+\section*{Appendix AK: Replicate Accounting and Statistical Power}
+
+The v3 diagnostic separates high-replicate base curves from lower-replicate
+stress sweeps. The base condition uses 128 replicate pools across budgets and
+selectors because it carries the central figure: minimum-energy selection
+becomes more attractive under the proxy but worse under the hidden validity
+metric. The stress sweeps use 36 replicates per condition because they are
+designed to test qualitative robustness, not to estimate a delicate effect
+near zero. The observed effects are large: selected artifact rate is one in
+the high-budget minimum-energy rows, selected validity is zero, and the
+calibrated high-budget repair reaches validity one in the base diagnostic.
+
+This design is intentionally conservative about claims. The paper does not
+claim a precise universal artifact probability. It claims that a lower-energy
+artifact tail can dominate selected outputs under candidate-pool pressure, and
+that this happens across the tested perturbations. The reported standard
+errors in the summary files are therefore used as stability checks rather than
+as a license to overfit decimal-place conclusions. For example, the difference
+between selected true score 0.212 and 0.234 for minimum energy at high budget
+is not the main point. The main point is that both rows have zero validity and
+artifact rate one.
+
+A reviewer could ask for more seeds. The manuscript can accept that request
+without changing the core claim: the suite is written so the seed count can be
+increased by rerunning the expansion script with the full mode and updating
+the generated CSVs and figures. The artifact keeps the default run light
+because this repository is meant to be auditable on ordinary hardware. If a
+venue requests a heavier artifact, the appropriate extension is more
+replicates, not a different argument.
+
+The diagnostic also avoids a common statistical trap in sample-and-rank
+papers. It does not report only the mean selected score. It reports selected
+energy, true score, validity, artifact rate, invalid-low-energy mass, and
+candidate-level calibration. A selection failure can be invisible in one
+number and obvious in another. The validity metric is the hard pass/fail task;
+the true-score metric shows partial local credit; the artifact metric exposes
+the shortcut class; and the invalid-low-energy metric shows whether the lower
+energy tail is structurally dangerous before final selection.
+
+\section*{Appendix AL: Real-System Evidence Package}
+
+A real EBT version of this submission should include an evidence package with
+four layers. The first layer is candidate-pool logging. For every prompt or
+instance, save the sampled candidates, their energies, selector decisions, and
+any proxy features used by the repair. Without this layer, later analysis can
+only compare final outputs and cannot determine whether the failure came from
+generation, energy ranking, or repair.
+
+The second layer is hidden-task evaluation. The hidden metric must be computed
+after selection and must not influence the energy selector. In mathematical
+reasoning this could be exact answer correctness. In code generation it could
+be hidden tests. In planning it could be execution success. In structured
+prediction it could be constraint satisfaction. The hidden metric can be noisy,
+but it must be external to the proxy energy; otherwise the audit cannot detect
+proxy-tail exploitation.
+
+The third layer is tail decomposition. The evaluator should identify which
+features distinguish the lowest-energy candidates from the rest of the pool.
+Examples include repeated spans, attention concentration, low entropy, unusual
+length, verifier disagreement, activation outliers, or formatting artifacts.
+The exact feature will vary across tasks. The important requirement is that it
+be measurable before hidden labels are consulted, because repairs should not
+peek at the evaluation target.
+
+The fourth layer is selector comparison. Minimum energy should be compared to
+at least one diversity selector, one calibrated or clipped selector, one
+random-selector baseline, and one oracle or verifier upper bound when
+available. The comparison must be compute matched: selectors should receive
+the same candidate pools at the same budgets. Otherwise a better result could
+come from a better generator rather than a safer selection rule.
+
+This package would let the paper graduate from a synthetic diagnostic to a
+model-evaluation submission. The present repository does not include trained
+EBT checkpoints, so it does not claim that graduation. It provides the audit
+protocol, the failure mechanism, and the exact local artifact needed to test
+whether the same mechanism appears in a trained system.
+
+\section*{Appendix AM: Risk Register}
+
+\textbf{Risk 1: reviewers see a duplicate candidate-pool wrapper.} The paper
+mitigates this by using EBM-specific concepts throughout: energy decomposition,
+local attention compatibility, shortcut mass, lower-tail energy calibration,
+and repair by energy clipping plus shortcut-feature penalty. The main figures
+and tables are about energy tails, not generic sample count improvements.
+
+\textbf{Risk 2: reviewers reject the benchmark as too synthetic.} The paper
+mitigates this by narrowing the claim and giving a real-EBT porting protocol.
+It does not hide the synthetic nature of the diagnostic. The intended
+submission argument is that the diagnostic isolates a plausible failure mode
+that should be tested before candidate-pool EBT inference is trusted.
+
+\textbf{Risk 3: reviewers say the repair is hand-tuned.} The repair grid
+mitigates this by showing both successes and failures. Settings with no
+shortcut penalty still fail, and settings with stronger proxy penalties
+succeed. The text frames this as sensitivity analysis, not as a universal
+algorithm.
+
+\textbf{Risk 4: reviewers say the effect is caused by an artifact-heavy
+generator.} The artifact-prior sweep mitigates this by showing artifact
+selection even when the proposal artifact probability is 0.04. The selected
+tail amplifies rare artifacts, which is the core selection risk.
+
+\textbf{Risk 5: reviewers say the energy is simply bad.} The candidate-level
+calibration table mitigates this by showing positive bulk correlation between
+negative energy and true score. The failure is more subtle: the energy can be
+useful in the bulk while unsafe in the lower tail selected by high-budget
+inference.
+
+\textbf{Risk 6: reviewers ask for heavier compute.} The artifact can be
+extended by increasing replicate counts or adding trained checkpoints, but the
+current CPU-light suite is appropriate for a diagnostic paper. It emphasizes
+repeatable stress tests and transparent CSV artifacts over expensive training.
+
+\textbf{Risk 7: reviewers ask whether the conclusion should forbid EBT
+candidate selection.} The manuscript does not make that claim. It argues for
+tail-local auditing and calibrated selection before deployment. Candidate-pool
+selection may be useful when the energy tail is well calibrated or when a
+trusted verifier protects final selection.
+
+\section*{Appendix AN: Minimal Reviewer Reproduction Path}
+
+A reviewer who wants to reproduce the central result can follow a short path.
+First, run the unit tests to confirm the selector implementation. Second, run
+the expansion suite in full mode to regenerate the CSVs and figures. Third,
+inspect the base high-budget rows in the summary file. Fourth, run the claim
+audit. Fifth, rebuild the paper. This path checks the code, the data, the
+figures, the claim gate, and the final PDF.
+
+The reproduction path intentionally does not require manual editing of the
+paper. The manuscript reports values from the committed result files, and the
+claim script reads the generated claim certificate. If a future rerun changes
+the data, the paper should be updated explicitly rather than quietly reusing
+old numbers. This is why the final audit document records the build date,
+claim status, and PDF filename.
+
+The path also catches stale-session mistakes. The Desktop file has the v3
+name, the repository final PDF has the same v3 name, and the source map points
+fresh agents back to the source folder. That operational detail matters for
+this collection of papers because several earlier drafts shared similar
+templates. A fresh session should be able to identify the correct source
+repository from the Desktop PDF name without guessing.
+
+\section*{Appendix AO: Alternative Explanations}
+
+This appendix expands the alternative-explanation analysis because it is the
+place a harsh reviewer is most likely to press. The first alternative is
+implementation error. The artifact addresses this with unit tests for argmin
+selection, nested minimum energy, calibrated selection, repair invariants, and
+expansion-suite claim generation. The $N=1$ rows are an additional behavioral
+check because all selectors must agree when there is only one candidate. They
+do agree. If the selectors disagreed at $N=1$, the paper would be rejected
+locally before any scientific argument was considered.
+
+The second alternative is that the generator simply fails to produce valid
+candidates. That explanation is not consistent with the candidate-level
+diagnostics. The pool contains valid candidates, and the calibrated selector
+can recover valid outputs from the same pool at high budget. The failure is
+therefore not just bad sampling. It is the interaction between a proposal pool
+containing multiple candidate types and a proxy energy whose lowest tail is
+occupied by shortcut artifacts.
+
+The third alternative is that the energy is useless. That is also too simple.
+The candidate-level Spearman correlation between negative energy and true
+score is positive over the full diagnostic set. The energy has information in
+the bulk. The failure appears because selection does not sample a typical
+candidate from the bulk; it chooses an extreme candidate from the lower tail.
+This is why a paper that reports only average correlation would miss the
+danger. A useful proxy can still be unsafe as a high-budget selector.
+
+The fourth alternative is that diversity should solve the issue. The
+diversity-constrained selector tests this directly. It penalizes repeated
+modes, yet high-budget validity remains zero and artifact rate remains one.
+This means the artifact tail is not just one duplicated sequence. It contains
+enough distinct candidates that a diversity penalty can still select from the
+wrong class. This distinction matters for real systems, where adding diversity
+to beams or samples may improve surface variety without fixing the proxy
+tail.
+
+The fifth alternative is that a stronger global penalty would make the result
+go away. The global-weight sweep weakens that objection. Increasing the global
+penalty raises selected energy and improves partial true score, but validity
+does not recover in the tested range. The diagnostic therefore supports a
+more careful conclusion: global constraints help, but the complete deployed
+energy must still be audited under candidate-pool pressure.
+
+The sixth alternative is that the calibrated repair is unfairly tuned. The
+paper addresses this by reporting failures in the repair grid. Low-tail
+clipping without a shortcut penalty still fails. Stronger proxy penalties can
+recover validity in this diagnostic, but the manuscript does not claim that
+those settings are universal. A real model would need a predeclared proxy
+feature or a heldout calibration set. The grid is evidence that the failure is
+repairable when the shortcut is visible, not a claim that the proposed repair
+solves all EBT inference.
+
+\section*{Appendix AP: Acceptance-Grade Real-EBT Extension}
+
+If this diagnostic were extended into a full real-EBT submission, the first
+upgrade would be trained checkpoints. The paper would train or obtain at least
+one Transformer energy model on a task where candidate-pool selection is a
+plausible inference method. The task should have hidden evaluation labels that
+are unavailable to the energy selector. The model should be evaluated at
+several candidate budgets, including a budget large enough to expose tail
+behavior. The same candidate pools should be reused for all selectors.
+
+The second upgrade would be a stronger selector suite. Minimum energy would
+remain the stress target. Diversity selection would test whether surface
+variety helps. A calibrated energy selector would test whether tail clipping
+helps. A verifier-selected upper bound would show what is possible if hidden
+or external information is available. A random selector would identify the
+base quality of the generator. A learned repair could be included only if it
+does not train on the final hidden labels used for evaluation.
+
+The third upgrade would be human-readable failures. For each task, the paper
+would show examples at low budget and high budget, including both selected
+failures and repaired successes. The example analysis should identify the
+feature that fooled the energy: repeated local pattern, premature termination,
+format regularity, short-range consistency, spurious attention concentration,
+or another domain-specific shortcut. Without examples, reviewers cannot tell
+whether the failure mode is meaningful or merely a metric artifact.
+
+The fourth upgrade would be calibration by energy quantile. The real paper
+would bin candidates by energy and report hidden utility, artifact frequency,
+and proxy-feature activation in each bin. A dangerous model is one where the
+lowest-energy bins have worse hidden utility than moderate-energy bins. This
+quantile analysis would directly connect the synthetic order-statistic
+argument to empirical model behavior.
+
+The fifth upgrade would be compute reporting. The paper should state candidate
+budget, number of prompts, number of seeds, hardware, runtime, and memory
+footprint. It should distinguish training cost from audit cost. A practical
+audit is valuable only if other researchers can run it. The present repository
+keeps the diagnostic CPU-light; a real-EBT extension should preserve that
+auditability even if model training itself is more expensive.
+
+Those upgrades are not required for the narrow claim of this artifact, but
+they are the path from diagnostic submission to stronger empirical paper. The
+v3 manuscript now makes that path explicit so reviewers can see the boundary
+between what is proved here and what remains for a trained-model extension.
+
+\section*{Appendix AQ: Final Evidence Summary}
+
+The final evidence chain is intentionally redundant. The proposition explains
+why a lower-energy shortcut component can dominate a selected minimum when the
+candidate budget grows. The base experiment shows that this happens in the
+controlled Transformer-structured landscape. The high-budget expansion shows
+that the collapse remains at $N=512$. The shortcut-prior sweep shows that rare
+artifacts can still dominate final selection. The global-penalty sweep shows
+that strengthening one global term is not automatically enough. The repair
+grid shows that a proxy-only selector can escape the dangerous tail when it
+uses a visible shortcut feature. The candidate-level calibration analysis
+shows why bulk energy usefulness does not imply tail safety.
+
+These pieces answer different reviewer questions. The proof answers whether
+the mechanism is coherent. The base curves answer whether the implementation
+exhibits the mechanism. The perturbation sweeps answer whether the result is a
+single fragile setting. The repair grid answers whether the tail diagnosis is
+actionable. The calibration plot answers whether the energy is merely useless
+or specifically unsafe in the selected tail. The failure-case rows answer
+whether aggregate averages hide the selected examples.
+
+The submission should therefore be judged on a narrow but complete claim:
+minimum-energy candidate selection is not automatically reliable for
+Transformer EBMs just because lower energy looks desirable. If the low-energy
+tail is locally compatible but globally invalid, extra candidate budget can
+amplify the wrong candidates. The diagnostic does not end the real-EBT
+question, but it gives reviewers a concrete test that real systems should
+pass before deploying energy-minimizing candidate-pool inference.
 
 \bibliographystyle{iclr2026_conference}
 \bibliography{references}

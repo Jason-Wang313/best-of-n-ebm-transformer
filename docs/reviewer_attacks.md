@@ -33,6 +33,16 @@ would need those baselines.
 
 ## Attack: Results are too small for ICLR.
 
-Fair. The repo produces an anonymous ICLR-style paper, but the evidence level is
-closer to a workshop mechanism note or negative result. The final audit should
-make that explicit.
+The v3 paper expands the evidence substantially: 25 pages, N=512 stress,
+shortcut-prior sweeps, global-penalty sweeps, repair-grid sensitivity,
+candidate-level calibration, and failure-case logging. The remaining fair
+attack is the absence of trained EBT checkpoints, not the absence of a
+substantial diagnostic artifact.
+
+## Attack: The paper is a duplicate candidate-pool wrapper.
+
+The response is to keep the paper EBM-specific throughout: energy
+decomposition, local attention compatibility, shortcut mass, lower-tail energy
+calibration, and repair by energy clipping plus shortcut-feature penalty. The
+title, abstract, figures, tables, and appendix all avoid presenting the result
+as a generic best-of-N theorem.

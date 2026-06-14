@@ -1,0 +1,23 @@
+{
+  "mode": "full-v3",
+  "claim_pass": true,
+  "checks": {
+    "min_energy_enters_lower_tail": true,
+    "min_energy_validity_collapses": true,
+    "min_energy_artifact_rate_high": true,
+    "repair_improves_true_score": true,
+    "repair_reduces_artifacts": true,
+    "proxy_truth_rank_mismatch_exists": true
+  },
+  "key_numbers": {
+    "min_energy_n1_energy": -0.01602098745057963,
+    "min_energy_nmax_energy": -2.0585959417065904,
+    "min_energy_n1_validity": 0.3359375,
+    "min_energy_nmax_validity": 0.0,
+    "min_energy_nmax_artifact_rate": 1.0,
+    "min_energy_nmax_true_score": 0.23437499999999994,
+    "repair_nmax_true_score": 1.0,
+    "repair_nmax_artifact_rate": 0.0,
+    "candidate_spearman_neg_energy_true": 0.38072348859784844
+  }
+}
