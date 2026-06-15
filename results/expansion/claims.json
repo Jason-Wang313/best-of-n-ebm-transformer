@@ -1,5 +1,5 @@
 {
-  "mode": "full-v3",
+  "mode": "full-stress",
   "claim_pass": true,
   "checks": {
     "min_energy_enters_lower_tail": true,

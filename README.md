@@ -6,7 +6,7 @@ landscape where a Transformer-like energy scorer assigns very low energy to
 local attention-mediated shortcuts, while the true task requires global
 prompt-conditioned consistency.
 
-The v3 artifact contains:
+The v4 artifact contains:
 
 - a deterministic toy EBM Transformer landscape in `src/energy_tail_audit/`;
 - minimum-energy, calibrated clipping, and diversity-constrained selectors;
@@ -15,9 +15,11 @@ The v3 artifact contains:
 - a high-budget expansion suite with N=512 stress, shortcut-prior sweeps,
   global-penalty sweeps, repair-grid sensitivity, candidate-level calibration,
   and failure-case logging;
+- a real-data scikit-learn Digits hidden-completion benchmark required by the
+  final claim audit;
 - reproducible CSV/JSON summaries, figures, and a machine-readable claim
   certificate;
-- a 25-page anonymous ICLR-style v3 paper under `paper/`.
+- a 25-page anonymous ICLR-style v4 paper under `paper/`.
 
 ## Quickstart
 
@@ -25,6 +27,7 @@ The v3 artifact contains:
 python -m pytest -q
 python experiments/run_energy_tail_audit.py --preset smoke
 python experiments/run_expansion_suite.py --mode full --output results\expansion
+python -m experiments.run_digits_benchmark
 python experiments/build_literature_matrix.py
 ```
 
@@ -38,5 +41,5 @@ python scripts\run_claim_audit.py
 The final delivery PDF is copied to:
 
 ```text
-C:\Users\wangz\OneDrive\Desktop\best-of-n-ebm-transformer-v3.pdf
+C:\Users\wangz\OneDrive\Desktop\best-of-n-ebm-transformer-v4.pdf
 ```

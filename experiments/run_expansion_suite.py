@@ -67,7 +67,7 @@ PRESETS = {
         stress_trials=1,
     ),
     "full": SuiteConfig(
-        mode="full-v3",
+        mode="full-stress",
         seeds=32,
         trials_per_seed=4,
         n_values=(1, 2, 4, 8, 16, 32, 64, 128, 256, 512),
@@ -432,6 +432,8 @@ def _plot_calibration(candidates: list[dict[str, object]], output: Path) -> None
 
 
 def _claims(summary: list[dict[str, object]], correlations: list[dict[str, object]], mode: str) -> dict[str, object]:
+    full_stress = mode == "full-stress"
+
     def get(regime: str, method: str, n_value: int, metric: str, condition: str = "base") -> float:
         rows = [
             row
@@ -457,11 +459,11 @@ def _claims(summary: list[dict[str, object]], correlations: list[dict[str, objec
     all_corr = next(row for row in correlations if row["proposal_type"] == "all")
 
     checks = {
-        "min_energy_enters_lower_tail": min_e_max <= min_e_1 - (0.40 if mode == "full-v3" else 0.05),
-        "min_energy_validity_collapses": min_valid_max <= min_valid_1 - (0.25 if mode == "full-v3" else 0.01),
-        "min_energy_artifact_rate_high": min_artifact_max >= (0.90 if mode == "full-v3" else 0.20),
-        "repair_improves_true_score": repair_true_max >= min_true_max + (0.30 if mode == "full-v3" else 0.05),
-        "repair_reduces_artifacts": repair_artifact_max <= min_artifact_max - (0.50 if mode == "full-v3" else 0.05),
+        "min_energy_enters_lower_tail": min_e_max <= min_e_1 - (0.40 if full_stress else 0.05),
+        "min_energy_validity_collapses": min_valid_max <= min_valid_1 - (0.25 if full_stress else 0.01),
+        "min_energy_artifact_rate_high": min_artifact_max >= (0.90 if full_stress else 0.20),
+        "repair_improves_true_score": repair_true_max >= min_true_max + (0.30 if full_stress else 0.05),
+        "repair_reduces_artifacts": repair_artifact_max <= min_artifact_max - (0.50 if full_stress else 0.05),
         "proxy_truth_rank_mismatch_exists": float(all_corr["spearman_neg_energy_true"]) < 0.65,
     }
     return {
@@ -559,7 +561,7 @@ def run_suite(config: SuiteConfig, output: Path = RESULTS) -> dict[str, Path]:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run v3 shortcut-tail expansion diagnostics.")
+    parser = argparse.ArgumentParser(description="Run shortcut-tail expansion diagnostics.")
     parser.add_argument("--mode", choices=sorted(PRESETS), default="full")
     parser.add_argument("--output", type=Path, default=RESULTS)
     return parser.parse_args()

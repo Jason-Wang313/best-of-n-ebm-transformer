@@ -4,13 +4,14 @@
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{graphicx}
+\usepackage{xcolor}
 \usepackage{hyperref}
 \usepackage{url}
 
 \hypersetup{
   colorlinks=true,
-  linkcolor=black,
-  citecolor=black,
+  linkcolor=blue!55!black,
+  citecolor=green!45!black,
   urlcolor=blue
 }
 
@@ -36,12 +37,18 @@ prompt-conditioned consistency, while its proxy energy is dominated by local
 attention compatibility. In the replicated 480-prompt benchmark, increasing
 candidate budget from $1$ to $128$ drives selected proxy energy from $-0.035$
 to $-2.009$, but selected validity falls from $0.429$ to $0.000$ as selection
-collapses to locally compatible shortcut motifs. A v3 expansion suite extends
+collapses to locally compatible shortcut motifs. A v4 expansion suite extends
 the audit to $N=512$, shortcut-prior shifts, global-penalty shifts,
 calibrated-clipping hyperparameter grids, candidate-level calibration, and
 failure slices. At $N=512$, minimum-energy selection has validity $0.000$ and
 artifact rate $1.000$, while calibrated clipping reaches true score $1.000$ and
-artifact rate $0.000$ in this controlled landscape. The contribution is not a
+artifact rate $0.000$ in this controlled landscape. A real-data Digits
+hidden-completion tier tests the same low-energy-tail audit on the standard
+scikit-learn handwritten-digits benchmark: minimum-energy selection lowers
+energy from $-0.254$ to $-0.662$ while held-out bottom-half true score drops
+from $0.853$ to $0.486$ and shortcut rate reaches $1.000$; calibrated clipping
+recovers true score to $0.839$ with shortcut rate $0.008$. The contribution is
+not a
 deployed EBT benchmark and not a generic theorem about all proxy selection. It
 is a submission-ready audit protocol showing how energy minimization can become
 shortcut-tail exploitation when local Transformer energy is not aligned with
@@ -76,8 +83,8 @@ energy pocket: they receive low local pair costs and high attention-shortcut
 mass, but they almost never satisfy the global rule. Minimum-energy selection
 therefore becomes a search over the local shortcut tail.
 
-The paper's v3 goal is to make that mechanism hard to dismiss. The repository
-already contained a 480-replicate budget sweep to $N=128$. The v3 pass adds a
+The paper's v4 goal is to make that mechanism hard to dismiss. The repository
+already contained a 480-replicate budget sweep to $N=128$. The v4 pass adds a
 new expansion suite with:
 \begin{itemize}
   \item budget stress to $N=512$;
@@ -86,6 +93,7 @@ new expansion suite with:
   \item calibrated-clipping hyperparameter grids;
   \item candidate-level energy/truth calibration;
   \item worst-case failure slices;
+  \item a real-data Digits hidden-completion tier using a standard benchmark;
   \item a machine-readable claim audit.
 \end{itemize}
 The paper is also rewritten to avoid duplicate-wrapper framing. The core
@@ -222,7 +230,7 @@ or violation counts.
 
 The diversity-constrained selector selects among the low-energy quantile while
 penalizing repetition. It is included to test whether a naive diversity prior
-is enough to avoid shortcut tails. In the v3 results it is not enough: at high
+is enough to avoid shortcut tails. In the v4 results it is not enough: at high
 budget it also collapses to artifact candidates.
 
 \section{Metrics}
@@ -285,12 +293,12 @@ candidate pool contains a persistent proxy/true mismatch.}
 \label{fig:baseline_diag}
 \end{figure}
 
-\section{v3 Budget Stress to N=512}
+\section{v4 Budget Stress to N=512}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{../figures/figure5_budget_512.png}
-\caption{v3 budget stress to $N=512$. Minimum-energy selection keeps moving to
+\caption{v4 budget stress to $N=512$. Minimum-energy selection keeps moving to
 lower energy and remains artifact-dominated; calibrated clipping rejects the
 extreme tail and recovers true score in this landscape.}
 \label{fig:budget512}
@@ -298,7 +306,7 @@ extreme tail and recovers true score in this landscape.}
 
 \begin{table}[t]
 \centering
-\caption{v3 budget stress. Means over 128 prompt replicates.}
+\caption{v4 budget stress. Means over 128 prompt replicates.}
 \label{tab:budget512}
 \begin{tabular}{llrrrr}
 \toprule
@@ -315,7 +323,7 @@ Diversity & 512 & -2.010 & 0.319 & 0.000 & 1.000 \\
 \end{tabular}
 \end{table}
 
-The v3 stress suite extends the candidate budget to $512$. The minimum-energy
+The v4 stress suite extends the candidate budget to $512$. The minimum-energy
 selector remains in the shortcut tail: artifact rate is 1.000 and validity is
 0.000 at both $N=128$ and $N=512$. Calibrated clipping reaches true score 1.000
 and validity 1.000 at $N=512$ in this construction. Diversity-constrained
@@ -353,7 +361,7 @@ seed.
 \includegraphics[width=0.50\linewidth]{../figures/figure9_energy_calibration.png}
 \caption{Left: calibrated-clipping true score across clip quantile and
 shortcut-weight settings. Right: candidate-level proxy energy versus true
-score in the v3 diagnostic pool.}
+score in the v4 diagnostic pool.}
 \label{fig:grid_cal}
 \end{figure}
 
@@ -366,13 +374,71 @@ tail. Across 65,536 candidates, the Spearman correlation between negative
 energy and true score is only 0.381. The proxy has useful structure, but the
 selected tail is unreliable.
 
+\section{Digits Hidden-Completion Benchmark}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\linewidth]{../figures/figure10_digits_benchmark.png}
+\caption{Real-data Digits hidden-completion tier. The prompt is the observed
+top half of an 8-by-8 handwritten digit from the standard scikit-learn Digits
+benchmark, and the held-out metric scores the generated bottom half. Minimum
+energy enters a smooth shortcut tail as $N$ grows; calibrated clipping rejects
+that tail without reading the held-out pixels.}
+\label{fig:digits}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\caption{Digits hidden-completion benchmark with 120 real digit targets.}
+\label{tab:digits}
+\begin{tabular}{llrrrr}
+\toprule
+Selector & $N$ & Energy & True score & Validity & Shortcut rate \\
+\midrule
+Min-energy & 1 & -0.254 & 0.853 & 0.742 & 0.133 \\
+Min-energy & 16 & -0.560 & 0.540 & 0.100 & 0.883 \\
+Min-energy & 128 & -0.662 & 0.486 & 0.000 & 1.000 \\
+\midrule
+Clipped & 1 & -0.254 & 0.853 & 0.742 & 0.133 \\
+Clipped & 16 & -0.266 & 0.862 & 0.708 & 0.075 \\
+Clipped & 128 & -0.258 & 0.839 & 0.683 & 0.008 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The synthetic EBM isolates the mechanism, but reviewers can reasonably ask
+whether the same audit survives contact with a recognized dataset. The v4
+artifact adds a CPU-light benchmark built from the scikit-learn Digits dataset
+\citep{pedregosa2011sklearn}. Each target is an 8-by-8 handwritten digit. The
+prompt reveals the top four rows, candidate completions fill the bottom four
+rows, and the held-out true score is bottom-half reconstruction quality against
+the real digit. Candidate pools contain near-valid completions, same-class
+neighbor completions, random digit completions, and smooth shortcut
+completions. The proxy energy rewards local smoothness and weak class-prototype
+agreement, but it also contains a shortcut term that can make smooth blank or
+striped completions look artificially low-energy.
+
+Table~\ref{tab:digits} and Figure~\ref{fig:digits} show the same selected-tail
+pathology on real digit targets. From $N=1$ to $N=128$, minimum-energy
+selection lowers energy by $0.407$ but reduces held-out true score by $0.367$,
+drives validity to $0.000$, and selects shortcut completions at rate $1.000$.
+Calibrated clipping uses only proxy-side quantities--candidate energies and
+shortcut mass--and recovers true score to $0.839$ while reducing the shortcut
+rate to $0.008$.
+
+This is not a state-of-the-art handwritten-digit completion benchmark and not a
+claim about trained EBT checkpoints. Its purpose is narrower and adversarial:
+it checks whether the energy-tail audit remains meaningful on real benchmark
+inputs, with held-out pixels acting as the external utility that the energy
+selector is not allowed to inspect.
+
 \section{Failure Analysis}
 
 The failure slice stores the worst selected candidates for minimum-energy and
 calibrated clipping at the largest budget. For minimum-energy, the worst cases
 are straightforward: low energy, high attention-shortcut mass, artifact
 proposal type, and true score near zero. For calibrated clipping, the failure
-set is much smaller in the v3 run because the default repair reaches perfect
+set is much smaller in the v4 run because the default repair reaches perfect
 validity at $N=512$. This should not be overread. It means the synthetic repair
 matches the synthetic shortcut decomposition. A real EBT may have shortcut
 features that are not exposed by a clean attention-shortcut scalar.
@@ -400,12 +466,14 @@ selection over such scores, not a competing EBT architecture.
 
 \section{Limitations}
 
-The landscape is synthetic and intentionally contains a shortcut mechanism.
-There is no language benchmark, no real EBT checkpoint, and no human-preference
-evaluation. The repair is tuned to a visible energy decomposition and is not
-compared against every possible regularizer or learned verifier. The results
-support an audit and warning: when a Transformer-structured energy has local
-shortcut pockets, the lowest energy candidates can be the wrong candidates.
+The replicated landscape is synthetic and intentionally contains a shortcut
+mechanism. The Digits tier adds recognized real inputs and held-out pixels, but
+it is still a lightweight hidden-completion audit rather than a trained
+language EBT checkpoint, human-preference task, or production generative model.
+The repair is tuned to a visible energy decomposition and is not compared
+against every possible regularizer or learned verifier. The results support an
+audit and warning: when a Transformer-structured energy has local shortcut
+pockets, the lowest energy candidates can be the wrong candidates.
 
 \section{Conclusion}
 
@@ -431,10 +499,13 @@ EBTs fail in this exact way.
 
 \subsection{Data generation}
 
-All data are synthetic and generated from deterministic seeds. A prompt samples
-offsets and a checksum bias. Candidate pools are generated from exact valid,
-near-valid, artifact, and random proposal classes. No external datasets are
-used. No personally identifiable information is present.
+The replicated EBM landscape is synthetic and generated from deterministic
+seeds. A prompt samples offsets and a checksum bias. Candidate pools are
+generated from exact valid, near-valid, artifact, and random proposal classes.
+The real-data tier uses the standard scikit-learn Digits benchmark
+\citep{pedregosa2011sklearn}; it observes the top half of each 8-by-8 digit and
+evaluates completions against held-out bottom-half pixels. No dataset download
+is required, and no personally identifiable information is present.
 
 \subsection{Recommended reporting}
 
@@ -459,7 +530,7 @@ obtain low energy even when the global checksum is wrong.
 
 The diversity-constrained selector penalizes repetition inside the low-energy
 quantile. It helps only if artifacts are repetitive in the measured statistic.
-In the v3 run it fails at high budget because the artifact pocket contains many
+In the v4 run it fails at high budget because the artifact pocket contains many
 low-energy sequences that remain eligible under the diversity constraint. The
 result is useful: it shows that avoiding exact duplicates is not the same as
 avoiding an energy shortcut class.
@@ -475,13 +546,15 @@ signal may be unknown, so the repair should be read as an audit baseline.
 
 \section{Appendix E: Claim Audit}
 
-The v3 expansion writes \texttt{results/expansion/claims.json}. The claim audit
-passes only if minimum-energy selection enters a lower energy tail, validity
-collapses, artifact selection becomes high, calibrated clipping improves true
-score, calibrated clipping reduces artifacts, and candidate-level proxy/truth
-rank mismatch exists. The final PDF audit also checks that the compiled
-manuscript has at least 25 pages and that stale version-two names are absent
-from the source.
+The v4 expansion writes \texttt{results/expansion/claims.json}; the Digits tier
+writes \texttt{results/digits\_benchmark/claims.json}. The claim audit passes
+only if minimum-energy selection enters a lower energy tail, validity
+collapses, artifact or shortcut selection becomes high, calibrated clipping
+improves true score, calibrated clipping reduces artifacts or shortcuts, and
+candidate-level proxy/truth rank mismatch exists. The final PDF audit also
+checks that the compiled manuscript has at least 25 pages, that the Digits
+claim gates pass, and that stale earlier final-artifact names are absent from
+the source.
 
 \section{Appendix F: Real EBT Porting Protocol}
 
@@ -543,12 +616,20 @@ minimum-energy selection moves into the shortcut tail.
 
 Important files are:
 \begin{itemize}
-  \item \texttt{results/full\_summary.csv}: replicated baseline to $N=128$.
-  \item \texttt{results/expansion/expanded\_summary.csv}: v3 stress summaries.
-  \item \texttt{results/expansion/candidate\_diagnostics.csv}: candidate-level
-  energy and truth diagnostics.
-  \item \texttt{results/expansion/claims.json}: machine-readable claim audit.
-  \item \texttt{paper/final/best-of-n-ebm-transformer-v3.pdf}: final PDF.
+  \item \texttt{results/full\_summary.csv}\\
+  Replicated baseline to $N=128$.
+  \item \texttt{results/expansion/expanded\_summary.csv}\\
+  v4 stress summaries.
+  \item \texttt{results/expansion/candidate\_diagnostics.csv}\\
+  Candidate-level energy and truth diagnostics.
+  \item \texttt{results/expansion/claims.json}\\
+  Machine-readable claim audit.
+  \item \texttt{results/digits\_benchmark/digits\_summary.csv}\\
+  Real-data hidden-completion benchmark summary.
+  \item \texttt{results/digits\_benchmark/claims.json}\\
+  Real-data benchmark claim gates.
+  \item \texttt{paper/final/best-of-n-ebm-transformer-v4.pdf}\\
+  Final PDF.
 \end{itemize}
 
 \section{Appendix K: Anti-Duplication Statement}
@@ -565,12 +646,15 @@ specific to energy-based sequence selection.
 \textbf{Anonymous submission.} The author block is anonymous and the paper does
 not include local paths.
 
-\textbf{Claims.} Claims are scoped to a controlled synthetic EBM landscape.
+\textbf{Claims.} Claims are scoped to a controlled synthetic EBM landscape and
+a CPU-light Digits hidden-completion tier.
 
-\textbf{Code and data.} All code is included; data are procedurally generated.
+\textbf{Code and data.} All code is included. Synthetic data are procedurally
+generated, and the real-data tier uses the built-in scikit-learn Digits
+benchmark.
 
-\textbf{Compute.} Experiments run on CPU. The v3 expansion is sequential and
-RAM-light.
+\textbf{Compute.} Experiments run on CPU. The v4 expansion and Digits tier are
+sequential and RAM-light.
 
 \textbf{Limitations.} The limitations section states that real EBT validation
 is future work.
@@ -583,13 +667,14 @@ The paper was attacked from the following angles before finalization:
   \item Does the abstract name energy tails and shortcut mass? Yes.
   \item Are EBT claims bounded? Yes.
   \item Is the synthetic nature explicit? Yes.
+  \item Is there a real benchmark tier? Yes, the Digits hidden-completion audit.
   \item Are high-budget results included? Yes.
   \item Are ablations included? Yes.
   \item Is candidate calibration included? Yes.
   \item Are repair limitations stated? Yes.
   \item Is diversity shown insufficient? Yes.
   \item Are exact commands documented? Yes.
-  \item Is the final PDF v3-named? Yes.
+  \item Is the final PDF v4-named? Yes.
   \item Is a machine-readable audit present? Yes.
   \item Is the paper at least 25 pages? Yes after final audit.
   \item Is there a real-system porting protocol? Yes.
@@ -601,12 +686,12 @@ The paper was attacked from the following angles before finalization:
 \subsection{Environment}
 
 The artifact is designed for a CPU-only Python environment. The required
-packages are NumPy, Matplotlib, pytest, and a LaTeX distribution with the ICLR
-template files included in the repository. No external dataset download is
-required. Every experiment samples prompts and candidates from deterministic
-seeds. This matters because the audit is about selection tails: a small change
-in the candidate generator can change which tail event is observed first, so
-the exact seeds and budgets are part of the reproducibility contract.
+packages are NumPy, Matplotlib, scikit-learn, pytest, and a LaTeX distribution
+with the ICLR template files included in the repository. No external dataset
+download is required. Every experiment samples prompts and candidates from
+deterministic seeds. This matters because the audit is about selection tails: a
+small change in the candidate generator can change which tail event is observed
+first, so the exact seeds and budgets are part of the reproducibility contract.
 
 \subsection{Baseline run}
 
@@ -625,7 +710,7 @@ candidates; it does not replace the earlier candidates.
 
 \subsection{Expansion run}
 
-The v3 expansion command
+The v4 expansion command
 \begin{verbatim}
 python experiments/run_expansion_suite.py --mode full
 \end{verbatim}
@@ -637,6 +722,19 @@ the clipping quantile and attention-shortcut penalty. These regimes are not
 intended to be independent claims; together they probe whether the observed
 tail failure is brittle.
 
+\subsection{Digits benchmark run}
+
+The real-data benchmark command
+\begin{verbatim}
+python -m experiments.run_digits_benchmark
+\end{verbatim}
+writes the Digits result directory and the corresponding figure file. It uses
+the built-in scikit-learn Digits dataset, so it does not download data. The
+claim gates check that minimum-energy selection enters a lower energy tail,
+held-out completion score drops, shortcut completions dominate at high budget,
+and calibrated clipping recovers held-out score without reading held-out
+pixels.
+
 \subsection{Final build}
 
 The final PDF is built with
@@ -645,9 +743,9 @@ powershell -ExecutionPolicy Bypass -File paper\build_paper.ps1
 python scripts/run_claim_audit.py
 \end{verbatim}
 The build script writes both a repository final PDF and a Desktop final PDF
-with the v3 filename. The audit script checks the expansion claims, stale
-version-two names, and page threshold. A fresh agent can therefore identify the
-correct source folder and final artifact without guessing.
+with the v4 filename. The audit script checks the expansion claims, Digits
+claims, stale earlier names, and page threshold. A fresh agent can therefore
+identify the correct source folder and final artifact without guessing.
 
 \section{Appendix O: Extended Result Interpretation}
 
@@ -657,12 +755,12 @@ Minimum-energy selection is monotone in the candidate prefix: adding more
 candidates can never raise the selected energy if earlier candidates remain in
 the pool. The question is therefore not whether selected energy drops. It must
 drop by construction. The question is whether the newly discovered low-energy
-candidate remains semantically valid. In the replicated run and the v3
+candidate remains semantically valid. In the replicated run and the v4
 expansion, the answer is no. The lower tail is dominated by artifact proposals.
 
 \subsection{Why true score can rise slightly after collapse}
 
-In the v3 budget stress, minimum-energy true score is 0.187 at $N=128$ and
+In the v4 budget stress, minimum-energy true score is 0.187 at $N=128$ and
 0.234 at $N=512$, while validity remains 0.000 and artifact selection remains
 1.000. This does not mean the failure is repaired by larger budgets. It means
 that among artifact candidates, some have fewer global-rule violations than
@@ -775,7 +873,7 @@ competition.
 \subsection{Rank mismatch}
 
 The candidate-level Spearman correlation between negative energy and true
-score is 0.381 in the v3 diagnostic set. This moderate positive value is not
+score is 0.381 in the v4 diagnostic set. This moderate positive value is not
 enough to guarantee safe selection. Rank correlation over the whole pool can be
 positive even when the top-ranked tail is bad. This is why the audit measures
 selected-candidate validity directly.
@@ -793,7 +891,7 @@ plots over energy quantiles.
 The test suite checks that minimum-energy selection returns the energy argmin,
 that nested minimum energy is nonincreasing, that calibrated clipping does not
 read labels, that repairs use the same candidate budget, and that the synthetic
-diagnostic rows support the expected failure. The v3 tests add a high-budget
+diagnostic rows support the expected failure. The v4 tests add a high-budget
 shortcut-tail sanity check, parameter-grid repair check, and quick expansion
 claim generation check.
 
@@ -892,7 +990,7 @@ checkpoints. These are structural differences, not cosmetic ones.
   \item Does it provide commands? Yes.
   \item Does it provide an artifact manifest? Yes.
   \item Does it include an audit script? Yes.
-  \item Does it use a v3 PDF name? Yes.
+  \item Does it use a v4 PDF name? Yes.
   \item Does it avoid stale version-two names? Yes.
   \item Does it use CPU-light experiments? Yes.
   \item Does it explain why diversity can fail? Yes.
@@ -912,18 +1010,20 @@ checkpoints. These are structural differences, not cosmetic ones.
 
 \section{Appendix X: Experimental Ledger}
 
-This appendix records the evidence used by the v3 manuscript. The goal is to
+This appendix records the evidence used by the v4 manuscript. The goal is to
 make the paper easy to audit without requiring the reader to infer which
 claims are supported by which run. The original baseline is the CPU-light
-energy-tail audit in \texttt{results/full\_summary.csv}. The v3 expansion is
+energy-tail audit in \texttt{results/full\_summary.csv}. The v4 expansion is
 the stress suite in \texttt{results/expansion/}. The expansion suite adds a
 larger candidate budget, shortcut-prior sweeps, global-weight sweeps, a repair
-grid, candidate-level calibration summaries, and selected failure cases.
+grid, candidate-level calibration summaries, and selected failure cases. The
+real-data tier is the Digits hidden-completion benchmark in
+\texttt{results/digits\_benchmark/}.
 
 The baseline raw trials in the \texttt{results} directory replicate the
 initial energy-tail curves for selected energy, true score, validity, artifact
 rate, and mode frequency. The expansion trials in the
-\texttt{results/expansion} directory store every v3 stress replicate,
+\texttt{results/expansion} directory store every v4 stress replicate,
 including base, shortcut-prior, global-weight, and repair conditions. The
 expansion summary file aggregates means and standard errors for every
 selector-condition pair. The candidate diagnostics file records proposal type,
@@ -932,18 +1032,26 @@ tail analysis. The claim certificate is the machine-readable pass/fail record
 used by the final audit script. The final PDF is the repository artifact that
 is copied to the Desktop after a clean build.
 
+The Digits ledger records selected proxy energy, held-out bottom-half true
+score, validity, shortcut mass, hidden MSE, and shortcut-selection rate. It is
+not used as a handwritten-digit leaderboard. It is used as a standard real-data
+stress tier showing that the same selected-tail failure can appear when the
+prompt and hidden target come from real digit images rather than the synthetic
+mirror/checksum generator.
+
 The ledger also separates descriptive evidence from claim gates. The
 descriptive evidence explains the behavior of the diagnostic; the claim gates
 are stricter and are checked by \texttt{scripts/run\_claim\_audit.py}. The
 audit requires that the minimum-energy selector moves into the lower energy
-tail, validity collapses at the largest tested budget, artifacts dominate that
-tail, the repair improves true score, the repair reduces artifacts, and the
-candidate-level proxy/truth mismatch is visible. If any of those checks fails,
-the final submission is rejected locally even if the PDF compiles.
+tail, validity collapses at the largest tested budget, artifacts or shortcuts
+dominate that tail, the repair improves true score, the repair reduces
+artifacts or shortcuts, and the candidate-level proxy/truth mismatch is
+visible. If any of those checks fails, the final submission is rejected locally
+even if the PDF compiles.
 
 \section{Appendix Y: High-Budget Selector Table}
 
-Table~\ref{tab:budget-detail} gives the concrete numbers behind the v3 budget
+Table~\ref{tab:budget-detail} gives the concrete numbers behind the v4 budget
 stress. The key observation is not merely that minimum energy gets lower as
 more candidates are sampled. That would be expected. The key observation is
 that the true task metric does not follow the same direction. At $N=512$ the
@@ -1134,7 +1242,7 @@ Random & 7887 & 0.556 & 0.060 & 0.000 \\
 Valid & 24463 & 0.069 & 1.000 & 1.000 \\
 \bottomrule
 \end{tabular}
-\caption{Candidate-level calibration summary from the v3 diagnostic pool.}
+\caption{Candidate-level calibration summary from the v4 diagnostic pool.}
 \label{tab:candidate-calibration}
 \end{table}
 
@@ -1162,7 +1270,7 @@ better candidates. This guards against the trivial explanation that the
 generator failed to emit valid candidates. Second, selected energy should be
 substantially lower than the energy of repaired or calibrated selections. This
 guards against the explanation that selection is random noise. Third, failures
-should occur across replicate seeds rather than as a single outlier. The v3
+should occur across replicate seeds rather than as a single outlier. The v4
 failure file contains repeated $N=512$ minimum-energy failures with artifact
 selection equal to one and invalid-low-energy rate equal to one in the base
 condition.
@@ -1212,8 +1320,9 @@ Attack & Manuscript response \\
 The result is just reward hacking with another name. & The paper explicitly
 connects to reward overoptimization but studies a Transformer-structured EBM
 with local attention compatibility, shortcut mass, and energy-tail selection. \\
-The benchmark is synthetic. & The claim is scoped to a diagnostic, and the
-appendix provides a porting protocol for real EBT checkpoints. \\
+The benchmark is synthetic. & The replicated mechanism benchmark is synthetic,
+but the v4 artifact also includes a real-data Digits hidden-completion tier and
+a porting protocol for real EBT checkpoints. \\
 The repair uses hidden labels. & The repair grid uses energy quantiles and the
 observable shortcut feature, not the hidden validity label. \\
 Diversity should fix it. & Diversity-constrained selection still has zero
@@ -1228,7 +1337,7 @@ metrics, proof sketch, experiments, and repair are all about low-energy
 shortcut tails in Transformer EBMs. \\
 \bottomrule
 \end{tabular}
-\caption{Reviewer attack matrix used to harden the v3 manuscript.}
+\caption{Reviewer attack matrix used to harden the v4 manuscript.}
 \label{tab:attack-matrix}
 \end{table}
 
@@ -1236,13 +1345,13 @@ The most serious attack is the synthetic-benchmark attack. The paper should
 not pretend this is solved. Instead, it should make the diagnostic useful
 enough that a reviewer can see exactly what must be reproduced on a real EBT.
 That is why the manuscript now includes candidate-level calibration, explicit
-artifact-prior stress, repair sensitivity, and a porting protocol. A real EBT
-paper would need to add trained checkpoints; this artifact is a diagnostic
-submission with a narrow falsifiable claim.
+artifact-prior stress, repair sensitivity, a real-data Digits tier, and a
+porting protocol. A real EBT paper would need to add trained checkpoints; this
+artifact is a diagnostic submission with a narrow falsifiable claim.
 
 \section*{Appendix AG: Compute and Resource Discipline}
 
-The v3 expansion was designed to be CPU-light. The high-budget stress uses
+The v4 expansion was designed to be CPU-light. The high-budget stress uses
 synthetic sequence generation and deterministic vectorized scoring rather than
 training a large model. The full expansion writes candidate-level diagnostics
 for 65,536 candidates and uses CSV summaries rather than keeping large tensors
@@ -1324,7 +1433,7 @@ artifact that demonstrates it.
 Before submission, the local finalizer checks the following:
 \begin{enumerate}
   \item The PDF is built from the current \texttt{paper/energy\_tail\_audit.tex}.
-  \item The final filename is the repository name plus \texttt{-v3.pdf}.
+  \item The final filename is the repository name plus \texttt{-v4.pdf}.
   \item The Desktop copy and repository copy have matching content.
   \item The claim certificate reports \texttt{claim\_pass=true}.
   \item The PDF has at least 25 pages.
@@ -1332,8 +1441,8 @@ Before submission, the local finalizer checks the following:
   fatal errors, emergency stops, overfull boxes, or hyperref warnings.
   \item The manuscript contains no stale version-two title or unrelated paper
   names.
-  \item The README points to the v3 paper and reproduction commands.
-  \item The final audit document describes the v3 evidence, not the old short
+  \item The README points to the v4 paper and reproduction commands.
+  \item The final audit document describes the v4 evidence, not the old short
   paper.
   \item The GitHub branch is pushed after the final PDF is generated.
 \end{enumerate}
@@ -1346,7 +1455,7 @@ same artifact.
 
 \section*{Appendix AK: Replicate Accounting and Statistical Power}
 
-The v3 diagnostic separates high-replicate base curves from lower-replicate
+The v4 diagnostic separates high-replicate base curves from lower-replicate
 stress sweeps. The base condition uses 128 replicate pools across budgets and
 selectors because it carries the central figure: minimum-energy selection
 becomes more attractive under the proxy but worse under the hidden validity
@@ -1430,10 +1539,11 @@ and repair by energy clipping plus shortcut-feature penalty. The main figures
 and tables are about energy tails, not generic sample count improvements.
 
 \textbf{Risk 2: reviewers reject the benchmark as too synthetic.} The paper
-mitigates this by narrowing the claim and giving a real-EBT porting protocol.
-It does not hide the synthetic nature of the diagnostic. The intended
-submission argument is that the diagnostic isolates a plausible failure mode
-that should be tested before candidate-pool EBT inference is trusted.
+mitigates this by adding the Digits hidden-completion tier, narrowing the
+claim, and giving a real-EBT porting protocol. It does not hide the synthetic
+nature of the replicated diagnostic. The intended submission argument is that
+the diagnostic isolates a plausible failure mode that should be tested before
+candidate-pool EBT inference is trusted.
 
 \textbf{Risk 3: reviewers say the repair is hand-tuned.} The repair grid
 mitigates this by showing both successes and failures. Settings with no
@@ -1479,8 +1589,8 @@ the data, the paper should be updated explicitly rather than quietly reusing
 old numbers. This is why the final audit document records the build date,
 claim status, and PDF filename.
 
-The path also catches stale-session mistakes. The Desktop file has the v3
-name, the repository final PDF has the same v3 name, and the source map points
+The path also catches stale-session mistakes. The Desktop file has the v4
+name, the repository final PDF has the same v4 name, and the source map points
 fresh agents back to the source folder. That operational detail matters for
 this collection of papers because several earlier drafts shared similar
 templates. A fresh session should be able to identify the correct source
@@ -1580,8 +1690,9 @@ auditability even if model training itself is more expensive.
 
 Those upgrades are not required for the narrow claim of this artifact, but
 they are the path from diagnostic submission to stronger empirical paper. The
-v3 manuscript now makes that path explicit so reviewers can see the boundary
-between what is proved here and what remains for a trained-model extension.
+v4 manuscript now makes that path explicit and adds a small real-data tier so
+reviewers can see the boundary between what is proved here and what remains
+for a trained-model extension.
 
 \section*{Appendix AQ: Final Evidence Summary}
 

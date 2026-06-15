@@ -1,0 +1,48 @@
+{
+  "all_passed": true,
+  "checks": {
+    "digits_energy_tail_decreases": {
+      "description": "Minimum-energy selection enters a lower proxy-energy tail on real digit completions.",
+      "observed": -0.4074181012897798,
+      "op": "<",
+      "passed": true,
+      "threshold": -0.3
+    },
+    "digits_repair_recovers_true_score": {
+      "description": "Calibrated clipping recovers held-out completion score without using held-out pixels.",
+      "observed": 0.3533656020493749,
+      "op": ">",
+      "passed": true,
+      "threshold": 0.25
+    },
+    "digits_repair_reduces_shortcuts": {
+      "description": "Calibrated clipping reduces shortcut-completion selection at high budget.",
+      "observed": 0.9916666666666667,
+      "op": ">",
+      "passed": true,
+      "threshold": 0.7
+    },
+    "digits_shortcut_rate_high": {
+      "description": "High-budget minimum-energy selection is dominated by shortcut completions.",
+      "observed": 1.0,
+      "op": ">",
+      "passed": true,
+      "threshold": 0.9
+    },
+    "digits_true_score_drops": {
+      "description": "The lower energy tail has worse held-out bottom-half reconstruction score.",
+      "observed": -0.36679007511934997,
+      "op": "<",
+      "passed": true,
+      "threshold": -0.2
+    },
+    "digits_validity_collapses": {
+      "description": "High-budget minimum-energy selections rarely satisfy the held-out target threshold.",
+      "observed": 0.0,
+      "op": "<",
+      "passed": true,
+      "threshold": 0.1
+    }
+  },
+  "summary": "energy change -0.407, true-score change -0.367, repair gain 0.353."
+}

@@ -2,9 +2,10 @@
 
 ## Attack: The task is synthetic, so the result is not evidence about EBTs.
 
-Concede partially. The paper is a mechanism diagnostic, not a deployed-model
-benchmark. The intended value is to specify a minimal failure test that real EBT
-implementations should pass.
+Concede partially. The replicated mechanism benchmark is synthetic, but v4 adds
+a scikit-learn Digits hidden-completion tier with held-out real pixels. The
+paper is still a diagnostic, not a deployed-model benchmark. The intended value
+is to specify a minimal failure test that real EBT implementations should pass.
 
 ## Attack: The model bakes in the artifact.
 
@@ -33,11 +34,11 @@ would need those baselines.
 
 ## Attack: Results are too small for ICLR.
 
-The v3 paper expands the evidence substantially: 25 pages, N=512 stress,
+The v4 paper expands the evidence substantially: 25+ pages, N=512 stress,
 shortcut-prior sweeps, global-penalty sweeps, repair-grid sensitivity,
-candidate-level calibration, and failure-case logging. The remaining fair
-attack is the absence of trained EBT checkpoints, not the absence of a
-substantial diagnostic artifact.
+candidate-level calibration, failure-case logging, and a real-data Digits tier.
+The remaining fair attack is the absence of trained EBT checkpoints, not the
+absence of a substantial diagnostic artifact.
 
 ## Attack: The paper is a duplicate candidate-pool wrapper.
 

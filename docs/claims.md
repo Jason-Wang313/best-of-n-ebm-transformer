@@ -1,6 +1,7 @@
 # Claim Boundary
 
-Generated v3 claim status is written to `results/expansion/claims.json`.
+Generated v4 claim status is written to `results/expansion/claims.json`.
+The real-data Digits tier writes `results/digits_benchmark/claims.json`.
 
 ## Supported By Current Full Results
 
@@ -12,6 +13,8 @@ Generated v3 claim status is written to `results/expansion/claims.json`.
   setting at the same candidate budget.
 - The N=512 expansion, shortcut-prior stress, global-penalty stress, repair
   grid, and candidate-level calibration all support the narrow diagnostic claim.
+- The scikit-learn Digits hidden-completion tier shows the same low-energy-tail
+  failure on recognized real inputs with held-out bottom-half pixels.
 
 ## Weak Or Out Of Scope
 
@@ -35,5 +38,8 @@ Generated v3 claim status is written to `results/expansion/claims.json`.
   `figures/figure9_energy_calibration.png`.
 - Repair status: `results/claim_status.json`,
   `results/expansion/claims.json`.
+- Real-data tier: `figures/figure10_digits_benchmark.png`,
+  `results/digits_benchmark/digits_summary.csv`,
+  `results/digits_benchmark/claims.json`.
 - Non-label-leaking selector test:
   `tests/test_selection_and_claims.py::test_calibrated_clipping_does_not_read_labels`.

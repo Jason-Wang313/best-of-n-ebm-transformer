@@ -1,0 +1,21 @@
+{
+  "all_passed": true,
+  "benchmark": "sklearn_digits_hidden_completion",
+  "candidate_counts": [
+    1,
+    4,
+    16,
+    64,
+    128
+  ],
+  "claims": "C:\\Users\\wangz\\best-of-n-ebm-transformer\\results\\digits_benchmark\\claims.json",
+  "dataset": "scikit-learn load_digits / UCI Optical Recognition of Handwritten Digits",
+  "figure": "C:\\Users\\wangz\\best-of-n-ebm-transformer\\figures\\figure10_digits_benchmark.png",
+  "held_out_region": "bottom four rows of each 8x8 digit",
+  "observed_region": "top four rows of each 8x8 digit",
+  "quick": false,
+  "seed": 2026,
+  "summary": "C:\\Users\\wangz\\best-of-n-ebm-transformer\\results\\digits_benchmark\\digits_summary.csv",
+  "target_count": 120,
+  "trials": "C:\\Users\\wangz\\best-of-n-ebm-transformer\\results\\digits_benchmark\\digits_trials.csv"
+}

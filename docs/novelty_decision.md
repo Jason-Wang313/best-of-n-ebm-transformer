@@ -28,6 +28,8 @@ The surviving novelty is narrower:
    proxy/true mismatch.
 4. Evaluate a proxy-only repair that uses the energy decomposition, not true
    labels: calibrated lower-tail clipping plus attention-shortcut penalty.
+5. Add a CPU-light scikit-learn Digits hidden-completion tier that checks the
+   same low-energy-tail failure on recognized real inputs.
 
 ## Final Thesis For The Paper
 
@@ -37,7 +39,9 @@ as N increases from 1 to 128, the selected energy becomes much lower while the
 selected candidate collapses into locally compatible, globally invalid attention
 shortcut motifs. A simple proxy-only calibrated clipping selector prevents this
 failure in the toy setting at the same candidate/evaluation budget, but with a
-large energy-optimality tradeoff.
+large energy-optimality tradeoff. On the Digits tier, the same audit shows
+minimum-energy selection lowering proxy energy while worsening held-out
+bottom-half reconstruction.
 
 ## What We Must Not Claim
 
@@ -45,7 +49,7 @@ large energy-optimality tradeoff.
 - We do not claim inference-time reward hacking is new.
 - We do not claim the repair is generally better than proximity penalties,
   uncertainty hedging, or verifier calibration.
-- We do not claim benchmark-scale evidence.
+- We do not claim trained EBT benchmark-scale evidence.
 - We do not claim a theorem beyond the controlled construction and diagnostics.
 
 ## Strongest Supported Result
@@ -60,3 +64,6 @@ Full experiment, 480 prompt replicates:
 - Calibrated clipping at N=128 reaches true score 0.983 and validity 0.981,
   with selected proxy energy -0.065, so the repair trades away extreme proxy
   optimality.
+- Digits hidden-completion: minimum energy moves from -0.254 at N=1 to -0.662
+  at N=128, while held-out true score drops from 0.853 to 0.486 and shortcut
+  selection rises to 1.000.

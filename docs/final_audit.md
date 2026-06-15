@@ -10,9 +10,9 @@ validity. Increasing N finds lower proxy-energy candidates, but those
 candidates can be locally compatible attention-shortcut artifacts that violate
 the global prompt-conditioned task rule.
 
-## V3 Contribution
+## v4 Contribution
 
-The v3 paper is no longer a short template note. It is a 25-page ICLR-style
+The v4 paper is no longer a short template note. It is a 25-page ICLR-style
 submission artifact centered on shortcut-tail audits for Transformer EBMs. The
 surviving contribution is a focused diagnostic, not a universal theorem about
 all EBTs:
@@ -24,9 +24,10 @@ all EBTs:
 - minimum-energy, diversity-constrained, and calibrated clipping selectors;
 - repair-grid sensitivity;
 - candidate-level energy/true-score calibration;
+- scikit-learn Digits hidden-completion real-data tier;
 - failure-case logging and a machine-readable claim audit.
 
-## Strongest V3 Results
+## Strongest v4 Results
 
 The expansion suite in `results/expansion/` reports:
 
@@ -40,24 +41,29 @@ The expansion suite in `results/expansion/` reports:
   score but leaves selected validity at 0.000 for minimum-energy selection.
 - Candidate-level calibration has positive bulk Spearman correlation between
   negative energy and true score, but the lower energy tail is still unsafe.
+- On the Digits tier, minimum-energy selection lowers energy from -0.254 to
+  -0.662 while held-out true score drops from 0.853 to 0.486 and shortcut
+  selection reaches 1.000; calibrated clipping recovers true score to 0.839 and
+  cuts shortcut selection to 0.008.
 
 ## Verification
 
-Commands run for the v3 artifact:
+Commands run for the v4 artifact:
 
 - `python -m pytest -q`
 - `python -m compileall src tests experiments -q`
 - `python experiments\run_expansion_suite.py --mode full --output results\expansion`
+- `python -m experiments.run_digits_benchmark`
 - `powershell -ExecutionPolicy Bypass -File paper\build_paper.ps1`
 - `python scripts\run_claim_audit.py`
 
-The claim audit reports `submission-ready v3` and checks both the repository
-PDF and Desktop PDF.
+The claim audit reports `submission-ready v4` and checks both the repository
+PDF and Desktop PDF, plus the expansion and Digits claim gates.
 
 Final PDF checks:
 
-- Repository PDF: `paper/final/best-of-n-ebm-transformer-v3.pdf`
-- Desktop PDF: `C:\Users\wangz\OneDrive\Desktop\best-of-n-ebm-transformer-v3.pdf`
+- Repository PDF: `paper/final/best-of-n-ebm-transformer-v4.pdf`
+- Desktop PDF: `C:\Users\wangz\OneDrive\Desktop\best-of-n-ebm-transformer-v4.pdf`
 - Page count: 25 pages.
 - LaTeX log scan found no undefined references, citation failures, overfull
   boxes, fatal errors, emergency stops, LaTeX warnings, natbib warnings, or
@@ -67,9 +73,10 @@ Final PDF checks:
 
 ## Weaknesses Kept Explicit
 
-- Synthetic landscape only.
+- Synthetic landscape remains the main replicated mechanism evidence.
+- Digits is a CPU-light real-data tier, not a trained EBT checkpoint.
 - The artifact mechanism is intentionally built into the proxy energy.
-- No real EBT checkpoint, benchmark task, or human-preference evaluation.
+- No real EBT checkpoint or human-preference evaluation.
 - The repair is diagnostic and depends on an observable shortcut feature.
 - A trained-model extension should add checkpoints, hidden-task evaluation,
   quantile calibration plots, and stronger selector baselines.
@@ -78,7 +85,7 @@ Final PDF checks:
 
 Final PDF:
 
-`C:\Users\wangz\OneDrive\Desktop\best-of-n-ebm-transformer-v3.pdf`
+`C:\Users\wangz\OneDrive\Desktop\best-of-n-ebm-transformer-v4.pdf`
 
 GitHub repository:
 

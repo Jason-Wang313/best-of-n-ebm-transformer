@@ -82,5 +82,7 @@ report gains from inference-time computation.
 
 Response: this repo does not evaluate the EBT paper's model. It proposes a small
 controlled stress test that should be run before trusting naive minimum-energy
-selection over any Transformer-structured energy. The claim is an early warning,
-not a refutation.
+selection over any Transformer-structured energy. The v4 manuscript also adds a
+CPU-light Digits hidden-completion benchmark with held-out real pixels, but it
+still frames the result as an early warning rather than a refutation of trained
+EBT checkpoints.
