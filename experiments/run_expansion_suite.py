@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Callable
 
 import matplotlib
-matplotlib.use("Agg")
+matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -91,6 +91,12 @@ def _write_csv(path: Path, rows: list[dict[str, object]]) -> None:
 def _write_json(path: Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _figures_dir(output: Path) -> Path:
+    if output.resolve() == RESULTS.resolve():
+        return FIGURES
+    return output / "figures"
 
 
 def _summary(rows: list[dict[str, object]], group_keys: tuple[str, ...]) -> list[dict[str, object]]:
@@ -486,7 +492,8 @@ def _claims(summary: list[dict[str, object]], correlations: list[dict[str, objec
 
 def run_suite(config: SuiteConfig, output: Path = RESULTS) -> dict[str, Path]:
     output.mkdir(parents=True, exist_ok=True)
-    FIGURES.mkdir(parents=True, exist_ok=True)
+    figures_dir = _figures_dir(output)
+    figures_dir.mkdir(parents=True, exist_ok=True)
 
     rows, candidates = _run_budget_sweep(config)
     rows.extend(_run_prior_sweep(config))
@@ -534,11 +541,11 @@ def run_suite(config: SuiteConfig, output: Path = RESULTS) -> dict[str, Path]:
         },
     )
 
-    _plot_budget(summary, FIGURES / "figure5_budget_512.png")
-    _plot_condition(summary, "artifact_prior", "artifact_prob", FIGURES / "figure6_artifact_prior.png", "Shortcut prior stress")
-    _plot_condition(summary, "global_weight", "global_weight", FIGURES / "figure7_global_weight.png", "Global penalty stress")
-    _plot_repair_grid(summary, FIGURES / "figure8_repair_grid.png")
-    _plot_calibration(candidates, FIGURES / "figure9_energy_calibration.png")
+    _plot_budget(summary, figures_dir / "figure5_budget_512.png")
+    _plot_condition(summary, "artifact_prior", "artifact_prob", figures_dir / "figure6_artifact_prior.png", "Shortcut prior stress")
+    _plot_condition(summary, "global_weight", "global_weight", figures_dir / "figure7_global_weight.png", "Global penalty stress")
+    _plot_repair_grid(summary, figures_dir / "figure8_repair_grid.png")
+    _plot_calibration(candidates, figures_dir / "figure9_energy_calibration.png")
 
     for figure in [
         "figure5_budget_512.png",
@@ -547,7 +554,7 @@ def run_suite(config: SuiteConfig, output: Path = RESULTS) -> dict[str, Path]:
         "figure8_repair_grid.png",
         "figure9_energy_calibration.png",
     ]:
-        (output / figure).write_bytes((FIGURES / figure).read_bytes())
+        (output / figure).write_bytes((figures_dir / figure).read_bytes())
 
     return {
         "trials": trials_path,

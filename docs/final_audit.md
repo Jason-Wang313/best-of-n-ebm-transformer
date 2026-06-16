@@ -1,6 +1,6 @@
 # Final Audit
 
-Audit date: 2026-06-14.
+Audit date: 2026-06-16.
 
 ## Thesis
 
@@ -12,7 +12,7 @@ the global prompt-conditioned task rule.
 
 ## v4 Contribution
 
-The v4 paper is no longer a short template note. It is a 25-page ICLR-style
+The v4 paper is no longer a short template note. It is a 25+ page ICLR-style
 submission artifact centered on shortcut-tail audits for Transformer EBMs. The
 surviving contribution is a focused diagnostic, not a universal theorem about
 all EBTs:
@@ -25,6 +25,7 @@ all EBTs:
 - repair-grid sensitivity;
 - candidate-level energy/true-score calibration;
 - scikit-learn Digits hidden-completion real-data tier;
+- random and held-out oracle controls for the Digits tier;
 - failure-case logging and a machine-readable claim audit.
 
 ## Strongest v4 Results
@@ -45,6 +46,10 @@ The expansion suite in `results/expansion/` reports:
   -0.662 while held-out true score drops from 0.853 to 0.486 and shortcut
   selection reaches 1.000; calibrated clipping recovers true score to 0.839 and
   cuts shortcut selection to 0.008.
+- At the same N=128 Digits budget, random selection reaches true score 0.846
+  and the held-out oracle reaches true score 0.994 with validity 1.000, showing
+  that the pool contains good completions and that the collapse is caused by
+  low-energy selection.
 
 ## Verification
 
@@ -64,12 +69,15 @@ Final PDF checks:
 
 - Repository PDF: `paper/final/best-of-n-ebm-transformer-v4.pdf`
 - Desktop PDF: `C:\Users\wangz\OneDrive\Desktop\best-of-n-ebm-transformer-v4.pdf`
-- Page count: 25 pages.
+- Page count: 27 pages.
+- Final PDF SHA256:
+  `FCC4865A278B69C56D8B9D70132718E5996124728087ADCA181C48878D74F0CD`
 - LaTeX log scan found no undefined references, citation failures, overfull
   boxes, fatal errors, emergency stops, LaTeX warnings, natbib warnings, or
   hyperref warnings.
 - Stale-name scan found no v2 Desktop path or unrelated paper names after this
   audit update.
+- Visual QA inspected rendered pages 1, 7, 8, 20, 21, and 27.
 
 ## Weaknesses Kept Explicit
 

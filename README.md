@@ -15,11 +15,11 @@ The v4 artifact contains:
 - a high-budget expansion suite with N=512 stress, shortcut-prior sweeps,
   global-penalty sweeps, repair-grid sensitivity, candidate-level calibration,
   and failure-case logging;
-- a real-data scikit-learn Digits hidden-completion benchmark required by the
-  final claim audit;
+- a real-data scikit-learn Digits hidden-completion benchmark with random and
+  held-out oracle controls required by the final claim audit;
 - reproducible CSV/JSON summaries, figures, and a machine-readable claim
   certificate;
-- a 25-page anonymous ICLR-style v4 paper under `paper/`.
+- a 25+ page anonymous ICLR-style v4 paper under `paper/`.
 
 ## Quickstart
 

@@ -9,7 +9,7 @@ from typing import Any, Sequence
 
 import matplotlib
 
-matplotlib.use("Agg")
+matplotlib.use("Agg", force=True)
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -64,8 +64,12 @@ def run_digits_benchmark(
         )
         for n_value in n_values:
             candidates = pool[: int(n_value)]
-            for method in ("min_energy", "calibrated_clipped"):
-                selected_idx, score_used = _select(candidates, method)
+            for method in ("min_energy", "random_selector", "calibrated_clipped", "oracle_true_score"):
+                selected_idx, score_used = _select(
+                    candidates,
+                    method,
+                    seed=seed + target_id * 1009 + int(n_value) * 37,
+                )
                 row = {
                     **candidates[selected_idx],
                     "benchmark": "sklearn_digits_hidden_completion",
@@ -125,6 +129,8 @@ def claim_gates(summary: list[dict[str, Any]], *, quick: bool = False) -> dict[s
     min_1 = row("min_energy", 1)
     min_high = row("min_energy", max_n)
     repair_high = row("calibrated_clipped", max_n)
+    random_high = row("random_selector", max_n)
+    oracle_high = row("oracle_true_score", max_n)
     thresholds = {
         "energy_drop": -0.30 if not quick else -0.15,
         "true_drop": -0.20 if not quick else -0.15,
@@ -132,6 +138,8 @@ def claim_gates(summary: list[dict[str, Any]], *, quick: bool = False) -> dict[s
         "shortcut_rate": 0.90 if not quick else 0.80,
         "repair_true_gain": 0.25,
         "repair_shortcut_reduction": 0.70,
+        "random_true_margin": 0.05 if not quick else 0.02,
+        "oracle_validity": 0.90 if not quick else 0.80,
     }
     checks = {
         "digits_energy_tail_decreases": _claim(
@@ -170,6 +178,18 @@ def claim_gates(summary: list[dict[str, Any]], *, quick: bool = False) -> dict[s
             ">",
             "Calibrated clipping reduces shortcut-completion selection at high budget.",
         ),
+        "digits_random_baseline_beats_tail": _claim(
+            random_high["true_score_mean"] - min_high["true_score_mean"],
+            thresholds["random_true_margin"],
+            ">",
+            "A random high-budget selector is less damaged than selecting the lowest energy tail.",
+        ),
+        "digits_oracle_pool_contains_valid_alternatives": _claim(
+            oracle_high["valid_mean"],
+            thresholds["oracle_validity"],
+            ">",
+            "The same candidate pools contain held-out-valid alternatives at high budget.",
+        ),
     }
     return {
         "all_passed": all(payload["passed"] for payload in checks.values()),
@@ -177,7 +197,9 @@ def claim_gates(summary: list[dict[str, Any]], *, quick: bool = False) -> dict[s
         "summary": (
             f"energy change {min_high['proxy_energy_mean'] - min_1['proxy_energy_mean']:.3f}, "
             f"true-score change {min_high['true_score_mean'] - min_1['true_score_mean']:.3f}, "
-            f"repair gain {repair_high['true_score_mean'] - min_high['true_score_mean']:.3f}."
+            f"repair gain {repair_high['true_score_mean'] - min_high['true_score_mean']:.3f}, "
+            f"random gap {random_high['true_score_mean'] - min_high['true_score_mean']:.3f}, "
+            f"oracle validity {oracle_high['valid_mean']:.3f}."
         ),
     }
 
@@ -185,9 +207,19 @@ def claim_gates(summary: list[dict[str, Any]], *, quick: bool = False) -> dict[s
 def make_figure(summary: list[dict[str, Any]], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fig, axes = plt.subplots(1, 3, figsize=(11.4, 3.7), constrained_layout=True)
-    colors = {"min_energy": "#b23a48", "calibrated_clipped": "#2f7f6f"}
-    labels = {"min_energy": "minimum energy", "calibrated_clipped": "calibrated clipping"}
-    for method in ("min_energy", "calibrated_clipped"):
+    colors = {
+        "min_energy": "#b23a48",
+        "random_selector": "#667085",
+        "calibrated_clipped": "#2f7f6f",
+        "oracle_true_score": "#4f46e5",
+    }
+    labels = {
+        "min_energy": "minimum energy",
+        "random_selector": "random",
+        "calibrated_clipped": "calibrated clipping",
+        "oracle_true_score": "held-out oracle",
+    }
+    for method in ("min_energy", "random_selector", "calibrated_clipped", "oracle_true_score"):
         group = sorted([row for row in summary if row["method"] == method], key=lambda item: int(item["N"]))
         x = np.array([int(row["N"]) for row in group])
         axes[0].plot(x, [row["proxy_energy_mean"] for row in group], marker="o", color=colors[method], label=labels[method])
@@ -338,19 +370,27 @@ def _shortcut_hidden(rng: np.random.Generator) -> np.ndarray:
     return np.clip(hidden, 0.0, 1.0)
 
 
-def _select(candidates: list[dict[str, Any]], method: str) -> tuple[int, float]:
+def _select(candidates: list[dict[str, Any]], method: str, *, seed: int = 0) -> tuple[int, float]:
     energy = np.asarray([float(row["proxy_energy"]) for row in candidates])
     shortcut = np.asarray([float(row["shortcut_mass"]) for row in candidates])
     if method == "min_energy":
         idx = int(np.argmin(energy))
         return idx, float(energy[idx])
-    if method != "calibrated_clipped":
-        raise ValueError(f"unknown selector: {method}")
-    lower = float(np.quantile(energy, 0.20))
-    shortcut_center = float(np.median(shortcut))
-    score = np.maximum(energy, lower) + 0.90 * np.maximum(0.0, shortcut - shortcut_center)
-    idx = int(np.argmin(score))
-    return idx, float(score[idx])
+    if method == "random_selector":
+        rng = np.random.default_rng(seed)
+        idx = int(rng.integers(0, len(candidates)))
+        return idx, float(idx)
+    if method == "oracle_true_score":
+        true_score = np.asarray([float(row["true_score"]) for row in candidates])
+        idx = int(np.argmax(true_score))
+        return idx, float(true_score[idx])
+    if method == "calibrated_clipped":
+        lower = float(np.quantile(energy, 0.20))
+        shortcut_center = float(np.median(shortcut))
+        score = np.maximum(energy, lower) + 0.90 * np.maximum(0.0, shortcut - shortcut_center)
+        idx = int(np.argmin(score))
+        return idx, float(score[idx])
+    raise ValueError(f"unknown selector: {method}")
 
 
 def _claim(value: float, threshold: float, op: str, description: str) -> dict[str, Any]:

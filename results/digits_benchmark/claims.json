@@ -8,6 +8,20 @@
       "passed": true,
       "threshold": -0.3
     },
+    "digits_oracle_pool_contains_valid_alternatives": {
+      "description": "The same candidate pools contain held-out-valid alternatives at high budget.",
+      "observed": 1.0,
+      "op": ">",
+      "passed": true,
+      "threshold": 0.9
+    },
+    "digits_random_baseline_beats_tail": {
+      "description": "A random high-budget selector is less damaged than selecting the lowest energy tail.",
+      "observed": 0.3596466875440701,
+      "op": ">",
+      "passed": true,
+      "threshold": 0.05
+    },
     "digits_repair_recovers_true_score": {
       "description": "Calibrated clipping recovers held-out completion score without using held-out pixels.",
       "observed": 0.3533656020493749,
@@ -44,5 +58,5 @@
       "threshold": 0.1
     }
   },
-  "summary": "energy change -0.407, true-score change -0.367, repair gain 0.353."
+  "summary": "energy change -0.407, true-score change -0.367, repair gain 0.353, random gap 0.360, oracle validity 1.000."
 }

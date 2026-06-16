@@ -47,8 +47,10 @@ hidden-completion tier tests the same low-energy-tail audit on the standard
 scikit-learn handwritten-digits benchmark: minimum-energy selection lowers
 energy from $-0.254$ to $-0.662$ while held-out bottom-half true score drops
 from $0.853$ to $0.486$ and shortcut rate reaches $1.000$; calibrated clipping
-recovers true score to $0.839$ with shortcut rate $0.008$. The contribution is
-not a
+recovers true score to $0.839$ with shortcut rate $0.008$. Random and held-out
+oracle controls score $0.846$ and $0.994$ respectively at the same budget,
+showing that the collapse is induced by low-energy selection rather than by a
+bad candidate pool. The contribution is not a
 deployed EBT benchmark and not a generic theorem about all proxy selection. It
 is a submission-ready audit protocol showing how energy minimization can become
 shortcut-tail exploitation when local Transformer energy is not aligned with
@@ -389,7 +391,8 @@ that tail without reading the held-out pixels.}
 
 \begin{table}[t]
 \centering
-\caption{Digits hidden-completion benchmark with 120 real digit targets.}
+\caption{Digits hidden-completion benchmark with 120 real digit targets.
+Random and held-out oracle controls are shown at the largest budget.}
 \label{tab:digits}
 \begin{tabular}{llrrrr}
 \toprule
@@ -402,6 +405,9 @@ Min-energy & 128 & -0.662 & 0.486 & 0.000 & 1.000 \\
 Clipped & 1 & -0.254 & 0.853 & 0.742 & 0.133 \\
 Clipped & 16 & -0.266 & 0.862 & 0.708 & 0.075 \\
 Clipped & 128 & -0.258 & 0.839 & 0.683 & 0.008 \\
+\midrule
+Random & 128 & -0.243 & 0.846 & 0.683 & 0.100 \\
+Oracle & 128 & -0.227 & 0.994 & 1.000 & 0.000 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -424,13 +430,20 @@ selection lowers energy by $0.407$ but reduces held-out true score by $0.367$,
 drives validity to $0.000$, and selects shortcut completions at rate $1.000$.
 Calibrated clipping uses only proxy-side quantities--candidate energies and
 shortcut mass--and recovers true score to $0.839$ while reducing the shortcut
-rate to $0.008$.
+rate to $0.008$. Two controls make the diagnosis sharper. A random selector at
+the same $N=128$ budget reaches true score $0.846$ and shortcut rate $0.100$,
+so the failure is not caused merely by a poor candidate generator. A held-out
+oracle that reads the bottom-half target reaches true score $0.994$ and
+validity $1.000$, so the pool contains good completions that minimum-energy
+selection systematically avoids.
 
 This is not a state-of-the-art handwritten-digit completion benchmark and not a
 claim about trained EBT checkpoints. Its purpose is narrower and adversarial:
 it checks whether the energy-tail audit remains meaningful on real benchmark
 inputs, with held-out pixels acting as the external utility that the energy
 selector is not allowed to inspect.
+
+\clearpage
 
 \section{Failure Analysis}
 
@@ -1285,7 +1298,7 @@ the lower-budget and repaired selections.
 
 \section*{Appendix AE: Negative Controls}
 
-The manuscript uses several implicit negative controls. The first is $N=1$.
+The manuscript uses several negative controls. The first is $N=1$.
 With one candidate, all selectors are identical because there is no selection
 choice to make. This prevents the result from being attributed to a bug in the
 selector implementation: at $N=1$ the methods agree exactly. The second is the
@@ -1293,6 +1306,13 @@ calibrated selector. It receives the same candidate pools as minimum energy;
 therefore its improved validity cannot be explained by easier samples. The
 third is the diversity selector. It tests whether repetition avoidance alone
 solves the problem. It does not.
+
+The real-data Digits tier adds two explicit controls. A random selector checks
+whether larger candidate pools are intrinsically worse; it remains far above
+the minimum-energy tail at $N=128$. A held-out oracle checks whether the
+candidate pool contains good completions; it reaches validity $1.000$ at
+$N=128$. Together they rule out the simpler explanations that the candidate
+generator is uniformly bad or that high budget alone damages performance.
 
 A fourth negative control is the global-weight sweep. If the result were only
 caused by a missing global penalty, sufficiently increasing that penalty would

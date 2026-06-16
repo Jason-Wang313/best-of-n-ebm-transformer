@@ -1,0 +1,21 @@
+{
+  "paper": "best-of-n-ebm-transformer-v4.pdf",
+  "source_folder": "C:\\Users\\wangz\\best-of-n-ebm-transformer",
+  "github_remote": "https://github.com/Jason-Wang313/best-of-n-ebm-transformer.git",
+  "repository_pdf": "paper/final/best-of-n-ebm-transformer-v4.pdf",
+  "desktop_pdf": "C:\\Users\\wangz\\OneDrive\\Desktop\\best-of-n-ebm-transformer-v4.pdf",
+  "sha256": "FCC4865A278B69C56D8B9D70132718E5996124728087ADCA181C48878D74F0CD",
+  "pages": 27,
+  "verified_on": "2026-06-16",
+  "checks": {
+    "compileall": "passed",
+    "pytest": "13 passed",
+    "full_expansion_rerun": "claim_pass=true",
+    "digits_benchmark": "all_passed=true with random and held-out oracle controls",
+    "claim_audit": "submission-ready v4",
+    "latex_final_log_scan": "passed",
+    "repo_desktop_hash_match": true,
+    "pdf_render": "all 27 pages rendered",
+    "visual_qa": "pages 1, 7, 8, 20, 21, and 27 inspected"
+  }
+}
