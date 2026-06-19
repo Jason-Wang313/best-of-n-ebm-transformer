@@ -71,13 +71,16 @@ Final PDF checks:
 - Desktop PDF: `C:\Users\wangz\OneDrive\Desktop\best-of-n-ebm-transformer-v4.pdf`
 - Page count: 27 pages.
 - Final PDF SHA256:
-  `FCC4865A278B69C56D8B9D70132718E5996124728087ADCA181C48878D74F0CD`
+  `385EB378A8E795807A5598BF64623B975B96950455B45424323EB055B94832C1`
 - LaTeX log scan found no undefined references, citation failures, overfull
   boxes, fatal errors, emergency stops, LaTeX warnings, natbib warnings, or
   hyperref warnings.
+- PDF annotation audit found 49 link annotations: 27 green citation boxes,
+  5 red internal-reference boxes, and 17 cyan URL boxes. All annotations use
+  1pt visible borders matching the VLA role-model profile.
 - Stale-name scan found no v2 Desktop path or unrelated paper names after this
   audit update.
-- Visual QA inspected rendered pages 1, 7, 8, 20, 21, and 27.
+- Visual QA inspected rendered pages 1, 4, 5, 6, 7, 8, 9, 17, 21, and 27.
 
 ## Weaknesses Kept Explicit
 
